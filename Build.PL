@@ -11,7 +11,10 @@ my $builder = Module::Build->new(
         'Test::More'  => 0,
         'Pod::Parser' => 0,
     },
-    add_to_cleanup      => [ 'Test-Pod-Snippets-*' ],
+    sign                => 1,
+    add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],
+    create_makefile_pl  => 'traditional',
+    PL_files            => { 'script/test-pod-snippets.PL' => q{}  },
 );
 
 $builder->create_build_script();
