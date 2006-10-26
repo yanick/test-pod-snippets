@@ -1,4 +1,7 @@
 Revision history for Test-Pod-Snippets
 
+0.02  
+    * Added Test::Signature test
+
 0.01    Wed Aug 23, 2006
         First version, released on an unsuspecting world.
