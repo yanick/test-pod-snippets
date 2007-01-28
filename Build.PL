@@ -14,7 +14,7 @@ my $builder = Module::Build->new(
     sign                => 1,
     add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],
     create_makefile_pl  => 'traditional',
-    PL_files            => { 'script/test-pod-snippets.PL' => q{}  },
+#    PL_files            => { 'script/test-pod-snippets.PL' => q{}  },
 );
 
 $builder->create_build_script();
