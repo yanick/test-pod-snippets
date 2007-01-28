@@ -1,6 +1,7 @@
 Revision history for Test-Pod-Snippets
 
-0.02  
+0.02    Sun Jan 28, 2007
+    * Added mention of Test::Inline in the pod
     * Added Test::Signature test
 
 0.01    Wed Aug 23, 2006

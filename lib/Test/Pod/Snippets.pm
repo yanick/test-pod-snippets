@@ -7,7 +7,7 @@ use Carp;
 use Pod::Parser;
 use base qw/ Pod::Parser /;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 our $ignore = 0;
 our $ignore_all = 0;
