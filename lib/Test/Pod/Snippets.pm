@@ -63,6 +63,7 @@ sub verbatim {
 
     print {$parser->output_handle} $paragraph;
 }
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 sub generate_snippets {
@@ -282,7 +283,7 @@ in I<$file>.
 
 =head1 AUTHOR
 
-Yanick Champoux, C<< <cpan at babyl.dyndns.org> >>
+Yanick Champoux, C<< <yanick at cpan.org> >>
 
 =head1 BUGS
 
@@ -322,11 +323,43 @@ L<http://search.cpan.org/dist/Test-Pod-Snippets>
 
 =back
 
-=head1 ACKNOWLEDGEMENTS
+=head1 SEE ALSO
+
+Adam Kennedy's L<Test::Inline>. Whereas I<Test::Pod::Snippets> extracts
+tests out of the modules' documentation, I<Test::Inline> 
+allows to insert tests within a module, side-by-side with its code 
+and documentation. 
+
+For example, the following code using I<Test::Pod::Snippets>
+
+    =head2 shout()
+
+    Shoutify the passed string.
+
+        # set $x to 'CAN YOU HEAR ME NOW?'
+        my $x = shout( 'can you hear me now?' );
+
+        =for test
+        is $x => 'CAN YOU HEAR ME NOW?';
+
+is equivalent to this code, using I<Test::Inline>:
+
+    =head2 shout()
+
+    Shoutify the passed string.
+
+        # set $x to 'CAN YOU HEAR ME NOW?'
+        my $x = shout( 'can you hear me now?' );
+
+    =begin testing
+    my $x = shout( 'can you hear me now?' );
+    is $x => 'CAN YOU HEAR ME NOW?';
+    =end testing
+
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2006 Yanick Champoux, all rights reserved.
+Copyright 2006, 2007 Yanick Champoux, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
