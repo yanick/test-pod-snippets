@@ -1,0 +1,7 @@
+#!/usr/bin/perl
+
+use Test::Pod::Snippets;
+
+my $xps = Test::Pod::Snippets->new;
+
+print $xps->extract_snippets( $_ ) for @ARGV;

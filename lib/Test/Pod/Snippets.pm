@@ -4,65 +4,20 @@ use warnings;
 use strict;
 use Carp;
 
-use Pod::Parser;
-use base qw/ Pod::Parser /;
+use Object::InsideOut;
+use Test::Pod::Snippets::Parser;
 
 our $VERSION = '0.02';
 
-our $ignore = 0;
-our $ignore_all = 0;
-our $within_begin_test = 0;
+my @parser_of   :Field;
+my @do_verbatim :Field :Default(1) :Arg(get_verbatim);
 
-sub initialize {
-    $ignore = 0;
-    $ignore_all = 0;
-    $_[0]->SUPER::initialize;
+sub _init :Init {
+    my $self = shift;
+
+    $parser_of[ $$self ] = Test::Pod::Snippets::Parser->new;
 }
 
-sub command {
-    my ($parser, $command, $paragraph) = @_;
-
-    if ( $command eq 'for' ) {
-        my( $target, $directive, $rest ) = split ' ', $paragraph, 3;
-
-        return unless $target eq 'test';
-
-        return $ignore = 1 if $directive eq 'ignore';
-        return $ignore_all = 1 if $directive eq 'ignore_all';
-
-        $ignore = 0;
-        no warnings qw/ uninitialized /;
-        print {$parser->output_handle} join ' ', $directive, $rest;
-    }
-    elsif( $command eq 'begin' ) {
-        my( $target, $rest ) = split ' ', $paragraph, 2;
-        return unless $target eq 'test';
-        $within_begin_test = 1;
-        print {$parser->output_handle} $rest;
-    }
-    elsif( $command eq 'end' ) {
-        my( $target, $rest ) = split ' ', $paragraph, 2;
-        return unless $target eq 'test';
-
-        $within_begin_test = 0;
-    }
-}
-
-sub textblock {
-    return unless $within_begin_test;
-
-    my ( $parser, $paragraph ) = @_;
-    print {$parser->output_handle} $paragraph;
-}
-sub interior_sequence {}
-
-sub verbatim {
-    return if ( $ignore or $ignore_all ) and not $within_begin_test;
-
-    my ($parser, $paragraph) = @_;
-
-    print {$parser->output_handle} $paragraph;
-}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -85,32 +40,53 @@ sub generate_snippets {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+sub extract_from_string {
+    my ( $self, $string ) = @_;
+    open my $pod_fh, '<', \$string;
+    return $self->extract_snippets( $pod_fh );
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 sub extract_snippets {
     my( $self, $file ) = @_;
 
-    unless( -f $file ) {
-        carp "couldn't read file '$file'";
-        return;
+    my $filename_call = 'GLOB' ne ref $file;
+
+    if( $filename_call and not -f $file ) {
+        croak "$file doesn't seem to exist";
     }
 
     my $output;
     open my $fh, '>', \$output;
-    $self->parse_from_file( $file, $fh );
+
+    if ( $filename_call ) {
+        $parser_of[ $$self ]->parse_from_file( $file, $fh );
+    } 
+    else {
+        $parser_of[ $$self ]->parse_from_filehandle( $file, $fh );
+    }
+
+    my $filename = $filename_call ? $file : 'unknown';
 
     return <<"END_TESTS";
-        use Test::More qw/ no_plan /;
+use Test::More qw/ no_plan /;
+#use Test::Group;
 
-        no warnings;
-        no strict;    # things are likely to be sloppy
+no warnings;
+no strict;    # things are likely to be sloppy
 
-        # tests extracted from '$file'
+#test $filename => sub {
 
-        ok 1 => 'the tests compile';   
+ok 1 => 'the tests compile';   
 
-        $output
+$output
 
-        ok 1 => 'we reached the end!';
+ok 1 => 'we reached the end!';
+#};
+
 END_TESTS
+
 }
 
 sub snippets_ok {
@@ -270,13 +246,6 @@ the pod found within and create the test file F<t/code-snippets-xx.t>.
     $file = 'lib/Test/Pod/Snippets.pm';
 
     $test_script = $tps->extract_snippets( $file )
-
-=for test ;
-    open my $tc_fh, '<', 't/pod-snippets-01.t';
-    {
-        local $/ = undef;
-        is $test_script => <$tc_fh>, 'extract_snippets()';
-    }
 
 Returns the code of a test script containing the code snippets found
 in I<$file>.
