@@ -9,11 +9,8 @@ use base qw/ Pod::Parser /;
 sub initialize {
     $_[0]->SUPER::initialize;
     $_[0]->{$_} = 0 for qw/ tps_ignore tps_ignore_all tps_within_begin_test /;
-    $_[0]->{tps_object_name}       = '$thingy';
-    $_[0]->{tps_extract_methods}   = 0;
-    $_[0]->{tps_extract_functions} = 0;
-    $_[0]->{tps_classname}         = 'Unknown::Class::Name';
-
+    $_[0]->{tps_method_level} = 0;
+    $_[0]->{tps_function_level} = 0;
 }
 
 sub command {
@@ -45,28 +42,55 @@ sub command {
     }
     elsif( $command =~ /^head(\d+)/ ) {
 
-        return unless $parser->{tps_method_header};
+$DB::single = 1;
+        return unless $parser->{tps}->is_extracting_functions 
+                   or $parser->{tps}->is_extracting_methods;
 
         my $level = $1;
+
+        for my $type ( qw/ tps_method_level tps_function_level / ) {
+            if ( $level <= $parser->{$type} ) {
+                $parser->{$type} = 0;
+            }
+        }
+
         if ( $paragraph =~ /^\s*METHODS\s*$/ ) {
-            $parser->{tps_method_level} = $level;
+            $parser->{tps_method_level} =
+                $parser->{tps}->is_extracting_methods && $level;
             return;
         }
 
-        if ( $level <= $parser->{tps_method_level} ) {
-            $parser->{tps_method_level} = 0;
+        if ( $paragraph =~ /^\s*FUNCTIONS\s*$/ ) {
+            $parser->{tps_function_level} = 
+                $parser->{tps}->is_extracting_functions && $level;
             return;
         }
 
         return if $parser->{tps_ignore} or $parser->{tps_ignore_all};
 
-        return if $level != 1 + $parser->{tps_method_level};
+        my $master_level =  $parser->{tps_method_level} 
+                         || $parser->{tps_function_level}
+                         || return ;
+
+        # functions and methods are one level deeper than
+        # their main header
+        return unless $level == 1 + $master_level; 
+
+        $paragraph =~ s/[IBC]<(.*?)>/$1/g;  # remove markups
 
         $paragraph =~ s/^\s+//;
         $paragraph =~ s/\s+$//;
 
-        print {$parser->output_handle} 
-              '@result = $', $parser->{tps_object_name}, "->$paragraph;\n";
+        if ( $parser->{tps_method_level} ) {
+            if ( $paragraph =~ /^new/ ) {
+                $paragraph = '$class->'.$paragraph;
+            }
+            else {
+                $paragraph = $parser->{tps}->get_object_name.'->'.$paragraph;
+            }
+        }
+
+        print {$parser->output_handle} '@result = ', $paragraph, ";\n";
     }
 }
 
@@ -79,15 +103,20 @@ sub textblock {
 sub interior_sequence {}
 
 sub verbatim {
-    return if  ( $_[0]->{tps_ignore} or $_[0]->{tps_ignore_all} ) 
-           and not $_[0]->{tps_within_begin_test};
+    my $self = shift;
 
-    print_paragraph( @_ ); 
+    return unless $self->{tps}->is_extracting_verbatim_bits;
+
+    return if ( $self->{tps_ignore} or $self->{tps_ignore_all} ) 
+           and not $self->{tps_within_begin_test};
+
+    print_paragraph( $self, @_ ); 
 }
 
 sub print_paragraph {
     my ( $parser, $paragraph, $line_no ) = @_;
 
+    $DB::single = 1;
     my $filename = $parser->input_file || 'unknown';
 
     # remove the indent

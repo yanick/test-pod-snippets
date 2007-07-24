@@ -2,15 +2,15 @@
 use strict;
 use warnings;
 
-use Test::More tests => 1;                      # last test to print
+use Test::More tests => 11;                      # last test to print
 
 use Test::Pod::Snippets;
 
 my $tps = Test::Pod::Snippets->new( );
 
-ok  $tps->is_getting_verbatim_bits, 'default: getting verbatim bits';
-ok !$tps->is_getting_methods,       'default: not getting methods';
-ok !$tps->is_getting_methods,       'default: not getting functions';
+ok  $tps->is_extracting_verbatim_bits, 'default: getting verbatim bits';
+ok !$tps->is_extracting_methods,       'default: not getting methods';
+ok !$tps->is_extracting_functions,     'default: not getting functions';
 
 my $pod = <<'END_POD';
 =head1 NAME
@@ -19,25 +19,45 @@ Foo - Make your programs footastic
 
 =head1 SYNOPSIS
 
-    print "Hello world!";
+    ONE
 
 =head1 METHODS
 
-=head2 new
+=head2 TWO
 
-=head2 meh
+=head2 THREE
 
 Do stuff, for example:
 
-    my $x = $foo->meh;
+    FOUR
 
 =head1 FUNCTIONS
 
-=head2 bar( $blah )
+=head2 FIVE
 
 yada yada
 
 END_POD
 
+my $snippets = $tps->extract_from_string( $pod );
 
+like    $snippets => qr/ONE/, 'catching verbatim stuff';
+like    $snippets => qr/FOUR/; 
+unlike  $snippets => qr/TWO|THREE|FIVE/, '..and nothing else';
 
+$tps->extract_verbatim_bits( 0 );
+$tps->extract_methods( 1 );
+
+$snippets = $tps->extract_from_string( $pod );
+
+like    $snippets => qr/TWO/, 'catching method bits';
+like    $snippets => qr/THREE/;
+unlike  $snippets => qr/ONE|FOUR|FIVE/, '... and nothing else';
+
+$tps->extract_methods( 0 );
+$tps->extract_functions( 1 );
+
+$snippets = $tps->extract_from_string( $pod );
+
+like    $snippets => qr/FIVE/, 'catching function bits';
+unlike  $snippets => qr/ONE|TWO|THREE|FOUR/, '... and nothing else';

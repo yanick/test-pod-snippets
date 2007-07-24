@@ -10,14 +10,50 @@ use Test::Pod::Snippets::Parser;
 our $VERSION = '0.02';
 
 my @parser_of   :Field;
-my @do_verbatim :Field :Default(1) :Arg(get_verbatim);
+
+my @do_verbatim  :Field :Default(1)      :Arg(extract_verbatim_bits);
+my @do_methods   :Field :Default(0)      :Arg(extract_methods);
+my @do_functions :Field :Default(0)      :Arg(extract_functions);
+my @object_name  :Field :Default('$thingy') :Arg(object_name);
 
 sub _init :Init {
     my $self = shift;
 
     $parser_of[ $$self ] = Test::Pod::Snippets::Parser->new;
+    $parser_of[ $$self ]->{tps} = $self;
 }
 
+sub get_object_name {
+    my $self = shift;
+    return $object_name[ $$self ];
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+sub is_extracting_verbatim_bits { return $do_verbatim[ ${$_[0]} ] }
+sub is_extracting_methods       { return $do_methods[ ${$_[0]} ] }
+sub is_extracting_functions     { return $do_functions[ ${$_[0]} ] }
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+sub extract_verbatim_bits {
+    my $self = shift;
+    return $do_verbatim[ $$self ] = shift;
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+sub extract_methods {
+    my $self = shift;
+    return $do_methods[ $$self ] = shift;
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+sub extract_functions {
+    my $self = shift;
+    return $do_functions[ $$self ] = shift;
+}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -71,19 +107,15 @@ sub extract_snippets {
 
     return <<"END_TESTS";
 use Test::More qw/ no_plan /;
-#use Test::Group;
 
 no warnings;
 no strict;    # things are likely to be sloppy
-
-#test $filename => sub {
 
 ok 1 => 'the tests compile';   
 
 $output
 
 ok 1 => 'we reached the end!';
-#};
 
 END_TESTS
 
