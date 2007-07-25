@@ -84,6 +84,10 @@ $DB::single = 1;
         if ( $parser->{tps_method_level} ) {
             if ( $paragraph =~ /^new/ ) {
                 $paragraph = '$class->'.$paragraph;
+                print {$parser->output_handle}
+                    $parser->{tps}->get_object_name,
+                    ' = $class->', $paragraph, ";\n";
+                return;
             }
             else {
                 $paragraph = $parser->{tps}->get_object_name.'->'.$paragraph;

@@ -255,13 +255,78 @@ ok 1 => 'begin works!';
 
 =head1 METHODS
 
-=head2 new
+=head2 new( I< %options > )
 
-    $tps = Test::Pod::Snippets->new
+Creates a new B<Test::Pod::Snippets> object. The method accepts
+the following options:
 
-=for test ;    
+=over
 
-Creates a new B<Test::Pod::Snippets> object.
+=item extract_verbatim_bits => $boolean 
+
+If set to true, extracts all verbatim text from the pod. 
+
+Set to true by default.
+
+=item extract_functions => $boolean
+
+If set to true, extracts function definitions from the pod.
+More specifically, Test::Pod::Snippets looks for a pod section 
+called FUNCTIONS, and assumes the title of all its direct
+subsections to be functions. 
+
+For example, the pod
+
+    =head1 FUNCTIONS
+
+    =head2 play_song( $artist, $song_title )
+
+    Play $song_title from $artist.
+
+    =head2 set_lighting( $intensity )
+
+    Set the room's light intensity (0 is pitch black 
+    and 1 is supernova white, -1 triggers the stroboscope).
+
+would generate the code
+
+    @result = play_song( $artist, $song_title );
+    @result = set_lightning( $intensity );
+
+Pod markups are automatically stripped from the headers. 
+
+=item extract_methods  => $boolean
+
+Same as I<extract_functions>, but with methods. In this
+case, Test::Pod::Snippets looks for a pod section called METHODS.
+The object used for the tests is assumed to be '$thingy',
+and its class to be given by the variable '$class'.
+
+For example, the pod
+
+    =head1 METHODS
+
+    =for test
+        $class = 'Amphibian::Frog';
+
+    =head2 new( $name )
+
+    Create a new froggy!
+
+    =head2 jump( $how_far )
+
+    Make it jumps.
+
+will produces
+
+    $class = 'Amphibian::Frog';
+    $thingy = $class->new( $name );
+    @result = $thingy->jump( $how_far );
+
+
+
+
+=back
 
 =head2 generate_snippets
 
