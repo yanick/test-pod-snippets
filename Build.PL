@@ -13,7 +13,8 @@ my $builder = Module::Build->new(
     },
     sign                => 1,
     add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],
-    create_makefile_pl  => 'traditional',
+    create_makefile_pl  => 'passthrough',
+    script_files        => [ qw/ pod2snippets  / ],
 #    PL_files            => { 'script/test-pod-snippets.PL' => q{}  },
 );
 

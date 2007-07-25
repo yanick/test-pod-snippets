@@ -6,6 +6,8 @@ use warnings;
 use Pod::Parser;
 use base qw/ Pod::Parser /;
 
+our $VERSION = '0.03_01';
+
 sub initialize {
     $_[0]->SUPER::initialize;
     $_[0]->{$_} = 0 for qw/ tps_ignore tps_ignore_all tps_within_begin_test /;

@@ -1,0 +1,6 @@
+.git
+MANIFEST.SKIP
+_build
+blib
+Build
+version.files
