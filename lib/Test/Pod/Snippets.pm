@@ -7,7 +7,7 @@ use Carp;
 use Object::InsideOut;
 use Test::Pod::Snippets::Parser;
 
-our $VERSION = '0.03_02';
+our $VERSION = '0.03_03';
 
 my @parser_of   :Field;
 

@@ -5,7 +5,7 @@ use Getopt::Long;
 use strict;
 use warnings;
 
-our $VERSION = '0.03_02';
+our $VERSION = '0.03_03';
 
 my ( $do_verbatim, $do_methods, $do_functions ) = ( 1, 0, 0 );
 
@@ -93,7 +93,7 @@ your bug as I make changes.
 
 =head1 VERSION
 
-This document describes pod2snippets version 0.03_02
+This document describes pod2snippets version 0.03_03
 
 =head1 AUTHOR
 
