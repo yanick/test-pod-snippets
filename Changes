@@ -1,8 +1,12 @@
 Revision history for Test-Pod-Snippets
 
+0.03_01 Tue Jul 24, 2007
+    * Added the possibility to extract function and method definitions.
+    * Lots of hacking and cleaning and experimenting.
+
 0.02    Sun Jan 28, 2007
     * Added mention of Test::Inline in the pod
     * Added Test::Signature test
 
 0.01    Wed Aug 23, 2006
-        First version, released on an unsuspecting world.
+    * First version, released on an unsuspecting world.
