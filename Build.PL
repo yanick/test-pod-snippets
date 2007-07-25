@@ -8,8 +8,9 @@ my $builder = Module::Build->new(
     dist_author         => 'Yanick Champoux <cpan@babyl.dyndns.org>',
     dist_version_from   => 'lib/Test/Pod/Snippets.pm',
     build_requires => {
-        'Test::More'  => 0,
-        'Pod::Parser' => 0,
+        'Test::More'        => 0,
+        'Pod::Parser'       => 0,
+        'Object::InsideOut' => 0,
     },
     sign                => 1,
     add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],

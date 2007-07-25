@@ -1,5 +1,8 @@
 Revision history for Test-Pod-Snippets
 
+0.03_03 Wed Jul 25, 2007
+    * Added Object::InsideOut dependency.
+
 0.03_02 Tue Jul 24, 2007
     * Fixed bug with new() munging.
 
