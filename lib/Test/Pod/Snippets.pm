@@ -7,7 +7,7 @@ use Carp;
 use Object::InsideOut;
 use Test::Pod::Snippets::Parser;
 
-our $VERSION = '0.03_01';
+our $VERSION = '0.03_02';
 
 my @parser_of   :Field;
 
@@ -391,8 +391,12 @@ L<http://search.cpan.org/dist/Test-Pod-Snippets>
 
 =head1 SEE ALSO
 
-Adam Kennedy's L<Test::Inline>. Whereas I<Test::Pod::Snippets> extracts
-tests out of the modules' documentation, I<Test::Inline> 
+L<pod2snippets>
+
+=head2 Test::Inline
+
+Whereas L<Test::Pod::Snippets> extracts
+tests out of the modules' documentation, Adam Kennedy's I<Test::Inline> 
 allows to insert tests within a module, side-by-side with its code 
 and documentation. 
 

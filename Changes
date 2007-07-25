@@ -1,5 +1,8 @@
 Revision history for Test-Pod-Snippets
 
+0.03_02 Tue Jul 24, 2007
+    * Fixed bug with new() munging.
+
 0.03_01 Tue Jul 24, 2007
     * Added the possibility to extract function and method definitions.
     * Lots of hacking and cleaning and experimenting.

@@ -6,7 +6,7 @@ use warnings;
 use Pod::Parser;
 use base qw/ Pod::Parser /;
 
-our $VERSION = '0.03_01';
+our $VERSION = '0.03_02';
 
 sub initialize {
     $_[0]->SUPER::initialize;
