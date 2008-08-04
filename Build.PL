@@ -11,6 +11,7 @@ my $builder = Module::Build->new(
         'Test::More'        => 0,
         'Pod::Parser'       => 0,
         'Object::InsideOut' => 0,
+        'Module::Locate'    => 0,
     },
     sign                => 1,
     add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],
