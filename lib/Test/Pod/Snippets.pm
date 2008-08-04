@@ -7,7 +7,7 @@ use Carp;
 use Object::InsideOut;
 use Test::Pod::Snippets::Parser;
 use Module::Locate qw/ locate /;
-use Params::Validate;
+use Params::Validate qw/ validate_with validate /;
 
 our $VERSION = '0.03_03';
 
@@ -35,7 +35,7 @@ my @do_functions :Field
                  :Set(extracts_functions)
                  ;
 #>>>
-                 #
+                 
 my @object_name  :Field :Default('$thingy') :Arg(object_name);
 
 sub _init :Init {
@@ -257,6 +257,42 @@ sub snippets_ok {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+sub generate_test_file {
+    my $self = shift;
+
+    my %param = validate_with( params => \@_,
+        spec => { output => 0 },
+        allow_extra => 1,
+    );
+
+    unless( $param{output} ) {
+        my $i;
+        my $name;
+        do { 
+            $i++; 
+            $name = sprintf "tps-%04d.t", $i 
+        } while -f $name;
+
+        $param{output} = $name;
+    }
+
+    my $filename = $param{output};
+
+    croak "file '$filename' already exists" if -f $filename;
+
+    open my $fh, '>', $filename 
+        or croak "can't create file '$filename': $!";
+
+    delete $param{output};
+
+    print {$fh} $self->generate_test( %param );
+
+    return $filename;
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 1; # End of Test::Pod::Snippets
 
 __END__
@@ -267,10 +303,16 @@ Test::Pod::Snippets - Generate tests from pod code snippets
 
 =head1 SYNOPSIS
 
+    use Test::More tests => 3;
+
     use Test::Pod::Snippets;
 
-    my $tps = Test::Pod::Snippets->new();
-    $tps->generate_snippets( @pm_and_pod_files );
+    my $tps = Test::Pod::Snippets->new;
+
+    my @modules = qw/ Foo Foo::Bar Foo::Baz /;
+
+    $tps->runtest( module => $_, testgroup => 1 ) for @modules;
+
 
 =head1 DESCRIPTION
 
@@ -300,15 +342,17 @@ code snippets -- and generate test files out of them.
 
 =head1 HOW TO USE TEST::POD::SNIPPETS IN YOUR DISTRIBUTION
 
-If you are using Module::Build, add the following
-to your Build.PL:
+The easiest way is to create a test.t file calling Test::Pod::Snippets
+as shown in the synopsis.  If, however, you don't want to 
+add T:P:S to your module's dependencies, you can 
+add the following to your Build.PL:
 
 =for test ignore
 
   my $builder = Module::Build->new(
     # ... your M::B parameters
     PL_files  => { 'script/test-pod-snippets.PL' => q{}  },
-    add_to_cleanup      => [ 't/pod-snippets-*.t' ],
+    add_to_cleanup      => [ 't/tps-*.t' ],
   );
 
 Then create the file F<script/test-pod-snippets.PL>, which should contains
@@ -317,19 +361,19 @@ Then create the file F<script/test-pod-snippets.PL>, which should contains
 
     my $tps = Test::Pod::Snippets->new;
 
-    $tps->generate_snippets( qw#
+    my @files = qw#
         lib/your/module.pm
         lib/your/documentation.pod
-    #);
+    #;
+    
+    print "generating tps tests...\n";
+    print $tps->generate_test_file( $_ ), "created\n" for @files;
+    print "done\n";
 
 =for test
 
 And you're set! Running B<Build> should now generate one test file
-for each given module.
-
-If you prefer to generate the tests yourself, skip the modifications
-to F<Build.PL> and call F<test-pod-snippets.PL> from the distribution's
-main directory.
+for each given file.
 
 =head1 SYNTAX
 
@@ -521,6 +565,21 @@ test, which will report a single 'ok' for the whole series of test
 to 'false' by default.
 
 =back
+
+=head2 generate_test_file( $input_type => I<$input>, %options )
+
+Does the same as C<generate_test>, but save the generated
+code in a file. The name of the file is the value of the
+option B<output>, if given. If the file already exist,
+the method dies.  If B<output> is not given, 
+the filename will be
+of the format 'tps-XXXX.t', where XXXX is choosen not to
+interfere with existing tests.  Exception made of C<output>,
+the options accepted by the method are the same than for
+C<generate_test>.
+
+Returns the name of the created file.
+
 
 =head2 runtest( $input_type => I<$input>, %options )
 
