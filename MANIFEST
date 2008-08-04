@@ -11,5 +11,6 @@ t/01-general.t
 t/02-extractions.t
 t/pod.t
 t/99signature.t
+t/generate_test.t
 Makefile.PL
 script/test-pod-snippets.PL

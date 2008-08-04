@@ -16,14 +16,16 @@ sub initialize {
 }
 
 sub command {
-    my ($parser, $command, $paragraph) = @_;
+    my ($parser, $command, $paragraph, $line_nbr ) = @_;
+
+    my $filename = $parser->input_file || 'unknown';
 
     if ( $command eq 'for' ) {
         my( $target, $directive, $rest ) = split ' ', $paragraph, 3;
 
         return unless $target eq 'test';
 
-        return $parser->{tps_ignore} = 1 if $directive eq 'ignore';
+        return $parser->{tps_ignore}     = 1 if $directive eq 'ignore';
         return $parser->{tps_ignore_all} = 1 if $directive eq 'ignore_all';
 
         $parser->{tps_ignore} = 0;
@@ -44,7 +46,6 @@ sub command {
     }
     elsif( $command =~ /^head(\d+)/ ) {
 
-$DB::single = 1;
         return unless $parser->{tps}->is_extracting_functions 
                    or $parser->{tps}->is_extracting_methods;
 
@@ -74,9 +75,9 @@ $DB::single = 1;
                          || $parser->{tps_function_level}
                          || return ;
 
-        # functions and methods are one level deeper than
+        # functions and methods are deeper than
         # their main header
-        return unless $level == 1 + $master_level; 
+        return unless $level > $master_level; 
 
         $paragraph =~ s/[IBC]<(.*?)>/$1/g;  # remove markups
 
@@ -95,7 +96,11 @@ $DB::single = 1;
             }
         }
 
-        print {$parser->output_handle} '@result = ', $paragraph, ";\n";
+        print {$parser->output_handle} 
+            "\n#line $line_nbr ", 
+            ( $parser->input_file || 'unknown' ),
+            "\n",
+            '@result = ', $paragraph, ";\n";
     }
 }
 

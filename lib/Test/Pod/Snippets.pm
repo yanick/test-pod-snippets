@@ -6,19 +6,26 @@ use Carp;
 
 use Object::InsideOut;
 use Test::Pod::Snippets::Parser;
+use Module::Locate qw/ locate /;
+use Params::Validate;
 
 our $VERSION = '0.03_03';
 
-my @parser_of   :Field;
+my @parser_of   :Field :Get(parser);
 
-my @do_verbatim  :Field :Default(1)      :Arg(extract_verbatim_bits);
-my @do_methods   :Field :Default(0)      :Arg(extract_methods);
-my @do_functions :Field :Default(0)      :Arg(extract_functions);
+my @do_verbatim  :Field :Default(1)      :Arg(verbatim)  :Std(verbatim);
+my @do_methods   :Field :Default(0)      :Arg(methods)   :Std(methods);
+my @do_functions :Field :Default(0)      :Arg(functions) :Std(functions);
 my @object_name  :Field :Default('$thingy') :Arg(object_name);
 
 sub _init :Init {
     my $self = shift;
 
+    $self->init_parser;
+}
+
+sub init_parser {
+    my $self = shift;
     $parser_of[ $$self ] = Test::Pod::Snippets::Parser->new;
     $parser_of[ $$self ]->{tps} = $self;
 }
@@ -84,6 +91,106 @@ sub extract_from_string {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+sub generate_test {
+    my $self = shift;
+
+    my %param = validate( @_, { 
+            pod => 0,  
+            file => 0,
+            fh => 0,
+            module => 0,
+            standalone => { default => 1 },
+            testgroup => 0,
+            sanity_tests => { default => 1 },
+        } );
+
+    my @type = grep { $param{$_} } qw/ pod file fh module /;
+
+    croak "method requires one of those parameters: pod, file, fh, module" 
+        unless @type;
+
+    if ( @type > 1 ) {
+        croak "can only accept one of those parameters: @type";
+    }
+
+    my $code =  $self->parse( $type[0], $param{ $type[0] } );
+
+    if ($param{standalone} or $param{testgroup} ) {
+        $param{sanity_tests} = 1;
+    }
+
+    if( $param{sanity_tests} ) {
+       $code = <<"END_CODE";
+ok 1 => 'the tests compile';   
+
+$code
+
+ok 1 => 'we reached the end!';
+END_CODE
+    }
+
+    if ( $param{testgroup} ) {
+        my $name = $param{file}   ? $param{file} 
+                 : $param{module} ? $param{module}
+                 : 'unknown'
+                 ;
+        $code = qq#use Test::Group; #
+              . qq#Test::Group::test "$name" => sub { $code }; #;
+    }
+
+    if ( $param{standalone} ) {
+        $code = <<"END_CODE";
+use Test::More 'no_plan';
+
+no warnings;
+no strict;    # things are likely to be sloppy
+
+$code
+END_CODE
+
+    }
+
+    return $code;
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+sub parse {
+    my ( $self, $type, $input ) = @_;
+
+    my $output;
+    open my $output_fh, '>', \$output;
+
+    if ( $type eq 'pod' ) {
+        my $copy = $input;
+        $input = undef;
+        open $input, '<', \$copy;
+        $type = 'fh';
+    }
+
+    if ( $type eq 'module' ) {
+        my $location = locate $input
+            or croak "$input not found in \@INC";
+        $input = $location;
+        $type = 'file';
+    }
+
+    $self->init_parser;
+
+    if ( $type eq 'file' ) {
+        $self->parser->parse_from_file( $input, $output_fh );
+    }
+    elsif( $type eq 'fh' ) {
+        $self->parser->parse_from_filehandle( $input, $output_fh );
+    }
+    else {
+        die "type $type unknown";
+    }
+
+    return $output;
+}
+
 sub extract_snippets {
     my( $self, $file ) = @_;
 
@@ -118,6 +225,58 @@ $output
 ok 1 => 'we reached the end!';
 
 END_TESTS
+
+}
+
+sub runtest {
+    my( $self, $file, $group ) = @_;
+
+    my $filename_call = not ref $file;
+
+    if( $filename_call and not -f $file ) {
+        croak "$file doesn't seem to exist";
+    }
+
+    my $output;
+    open my $fh, '>', \$output;
+
+    if ( $filename_call ) {
+        $parser_of[ $$self ]->parse_from_file( $file, $fh );
+    } 
+    else {
+        $parser_of[ $$self ]->parse_from_filehandle( $file, $fh );
+    }
+
+    my $filename = $filename_call ? $file : 'unknown';
+
+    use Test::Group;
+
+    my $group_b = 'Test::Group::test "blah" => sub { ' x !! $group;
+
+    my $group_e = '}' x !! $group;
+
+    my $sub = eval <<END_TEST;
+$group_b
+    sub {
+    use Test::More;
+    no strict;
+    no warnings;
+
+    ok 1, 'the test compile';
+
+$output
+
+    ok 1, 'we reached the end';
+
+$group_e
+}
+END_TEST
+
+    if ( $@ ) {
+        croak "couldn't compile test: $@";
+    }
+
+    $sub->();
 
 }
 
@@ -328,6 +487,50 @@ will produces
 
 =back
 
+=head2 generate_test( $input_type => I<$input>, %options )
+
+Extracts the pod off I<$input> and generate tests out of it.
+I<$input_type> can be 'file' (a filename), 
+'fh' (a filehandler), 'pod' (a string containing pod) or
+'module' (a module name).
+
+The method returns the generate tests as a string.
+
+The method accepts the following options:
+
+=over
+
+=item standalone => I<$boolean>
+
+If standalone is true (which is the default), the generated
+code will be a self-sufficient test script.
+
+    # create a test script out of the module Foo::Bar
+    open my $test_fh, '>', 't/foo-bar.t' or die;
+    print {$test_fh} $tps->generate_test( 
+        module     => 'Foo::Bar',
+        standalone => 1 ,
+    );
+
+=item sanity_tests => I<$boolean>
+
+If true (which is the default), two tests are added to the
+very beginning and end of the extracted code, like so:
+
+    ok 1 => 'the tests compile';   
+    $extracted_code
+    ok 1 => 'we reached the end!';
+
+=item testgroup => I<$boolean>
+
+If true, the extracted code will be wrapped in a L<Test::Group> 
+test, which will report a single 'ok' for the whole series of test
+(but will give more details if something goes wrong).  Is set
+to 'false' bu default.
+
+=back
+
+
 =head2 generate_snippets
 
     $tps->generate_snippets( @source_files )
@@ -429,7 +632,7 @@ is equivalent to this code, using I<Test::Inline>:
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2006, 2007 Yanick Champoux, all rights reserved.
+Copyright 2006, 2007, 2008 Yanick Champoux, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
