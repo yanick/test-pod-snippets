@@ -1,5 +1,11 @@
 Revision history for Test-Pod-Snippets
 
+0.04  Mon Aug  4 18:25:39 EDT 2008
+    * Added Module::Locate dependency.
+    * Changed the API quite a bit.
+    * Added possibility to use Test::Group.
+    * pod2snippets renamed to podsnippets.
+
 0.03_03 Wed Jul 25, 2007
     * Added Object::InsideOut dependency.
 

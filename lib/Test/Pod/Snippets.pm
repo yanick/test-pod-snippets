@@ -9,7 +9,7 @@ use Test::Pod::Snippets::Parser;
 use Module::Locate qw/ locate /;
 use Params::Validate qw/ validate_with validate /;
 
-our $VERSION = '0.03_03';
+our $VERSION = '0.04';
 
 #<<<
 my @parser_of   :Field :Get(parser);
