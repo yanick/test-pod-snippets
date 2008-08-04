@@ -10,3 +10,4 @@ issues
 .*~$
 Test-Pod-Snippets-.*\.tar\.gz
 perversionrc
+.releaserc
