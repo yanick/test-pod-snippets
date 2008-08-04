@@ -1,0 +1,11 @@
+Summary: add the option to have Test::Group'ed tests
+Status: New
+CreatedBy: Name <me@example.com>
+AssignedTo: 
+Inserted: 2008-08-01T19:58:24
+Updated: 2008-08-01T20:01:58
+
+my $code = $tps->generate_test( 
+    file => 'foo.pm', 
+    type => standard|group 
+);
