@@ -17,26 +17,36 @@ GetOptions( 'verbatim!' => \$do_verbatim,
 use Test::Pod::Snippets;
 
 my $xps = Test::Pod::Snippets->new(
-    extract_verbatim_bits => $do_verbatim,
-    extract_methods => $do_methods,
-    extract_functions => $do_functions,
+    verbatim => $do_verbatim,
+    methods => $do_methods,
+    functions => $do_functions,
 );
 
-print $xps->extract_snippets( $_ ) for @ARGV;
+print $xps->generate_test( guess_type( $_ ) => $_ ) for @ARGV;
+
+sub guess_type {
+    my $x = shift;
+
+    return   $x =~ /::/ ? 'module'  # that's easy
+           : -f $x      ? 'file'    # must mean the file
+           :              'module'  # check for a module...
+           ;
+
+}
 
 __END__
 
 =head1 NAME
 
-pod2snippets - extract tests out of Perl pod
+podsnippets - extract tests out of Perl pod
 
 =head1 SYNOPSIS
 
-B<pod2snippets> [ I<options> ] I<pod files>
+B<podsnippets> [ I<options> ] I<pod files>
 
 =head1 DESCRIPTION
 
-B<pod2snippets> extracts code out of the pod files it 
+B<podsnippets> extracts code out of the pod files it 
 receives as arguments and prints it out in stdout.
 
 =head1 OPTIONS
@@ -101,7 +111,7 @@ Yanick Champoux, C<< <yanick at cpan.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2006, 2007 Yanick Champoux, all rights reserved.
+Copyright 2006, 2007, 2008 Yanick Champoux, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

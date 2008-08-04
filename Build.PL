@@ -5,7 +5,7 @@ use Module::Build;
 my $builder = Module::Build->new(
     module_name         => 'Test::Pod::Snippets',
     license             => 'perl',
-    dist_author         => 'Yanick Champoux <cpan@babyl.dyndns.org>',
+    dist_author         => 'Yanick Champoux <yanick@cpan.org>',
     dist_version_from   => 'lib/Test/Pod/Snippets.pm',
     build_requires => {
         'Test::More'        => 0,
@@ -15,7 +15,7 @@ my $builder = Module::Build->new(
     sign                => 1,
     add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],
     create_makefile_pl  => 'passthrough',
-    script_files        => [ qw/ pod2snippets  / ],
+    script_files        => [ qw/ podsnippets  / ],
 #    PL_files            => { 'script/test-pod-snippets.PL' => q{}  },
 );
 
