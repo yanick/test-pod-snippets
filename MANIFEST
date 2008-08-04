@@ -5,7 +5,7 @@ META.yml # Will be created by "make dist"
 README
 lib/Test/Pod/Snippets.pm
 lib/Test/Pod/Snippets/Parser.pm
-pod2snippets
+podsnippets
 t/00-load.t
 t/01-general.t
 t/02-extractions.t

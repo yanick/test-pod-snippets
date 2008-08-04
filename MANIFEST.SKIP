@@ -4,3 +4,8 @@ _build
 blib
 Build
 version.files
+\.cil
+.*\.swp
+issues
+.*~$
+Test-Pod-Snippets-.*\.tar\.gz
