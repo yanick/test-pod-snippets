@@ -115,7 +115,7 @@ sub interior_sequence {}
 sub verbatim {
     my $self = shift;
 
-    return unless $self->{tps}->is_extracting_verbatim_bits;
+    return unless $self->{tps}->is_extracting_verbatim;
 
     return if ( $self->{tps_ignore} or $self->{tps_ignore_all} ) 
            and not $self->{tps_within_begin_test};

@@ -11,11 +11,31 @@ use Params::Validate;
 
 our $VERSION = '0.03_03';
 
+#<<<
 my @parser_of   :Field :Get(parser);
 
-my @do_verbatim  :Field :Default(1)      :Arg(verbatim)  :Std(verbatim);
-my @do_methods   :Field :Default(0)      :Arg(methods)   :Std(methods);
-my @do_functions :Field :Default(0)      :Arg(functions) :Std(functions);
+my @do_verbatim  :Field 
+                 :Default(1)         
+                 :Arg(verbatim)  
+                 :Get(is_extracting_verbatim)
+                 :Set(extracts_verbatim)
+                 ;
+
+my @do_methods   :Field 
+                 :Default(0)         
+                 :Arg(methods)   
+                 :Get(is_extracting_methods)
+                 :Set(extracts_methods)
+                 ;
+
+my @do_functions :Field 
+                 :Default(0)         
+                 :Arg(functions)
+                 :Get(is_extracting_functions)
+                 :Set(extracts_functions)
+                 ;
+#>>>
+                 #
 my @object_name  :Field :Default('$thingy') :Arg(object_name);
 
 sub _init :Init {
@@ -24,42 +44,19 @@ sub _init :Init {
     $self->init_parser;
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 sub init_parser {
     my $self = shift;
     $parser_of[ $$self ] = Test::Pod::Snippets::Parser->new;
     $parser_of[ $$self ]->{tps} = $self;
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 sub get_object_name {
     my $self = shift;
     return $object_name[ $$self ];
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub is_extracting_verbatim_bits { return $do_verbatim[ ${$_[0]} ] }
-sub is_extracting_methods       { return $do_methods[ ${$_[0]} ] }
-sub is_extracting_functions     { return $do_functions[ ${$_[0]} ] }
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub extract_verbatim_bits {
-    my $self = shift;
-    return $do_verbatim[ $$self ] = shift;
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub extract_methods {
-    my $self = shift;
-    return $do_methods[ $$self ] = shift;
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub extract_functions {
-    my $self = shift;
-    return $do_functions[ $$self ] = shift;
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,7 +96,7 @@ sub generate_test {
             file => 0,
             fh => 0,
             module => 0,
-            standalone => { default => 1 },
+            standalone => 0,
             testgroup => 0,
             sanity_tests => { default => 1 },
         } );
@@ -113,7 +110,7 @@ sub generate_test {
         croak "can only accept one of those parameters: @type";
     }
 
-    my $code =  $self->parse( $type[0], $param{ $type[0] } );
+    my $code = $self->parse( $type[0], $param{ $type[0] } );
 
     if ($param{standalone} or $param{testgroup} ) {
         $param{sanity_tests} = 1;
@@ -138,19 +135,18 @@ END_CODE
               . qq#Test::Group::test "$name" => sub { $code }; #;
     }
 
-    if ( $param{standalone} ) {
-        $code = <<"END_CODE";
-use Test::More 'no_plan';
+    my $plan = $param{standalone} ? '"no_plan"' : '' ;
 
+    return <<"END_CODE";
+use Test::More $plan;
+{
 no warnings;
 no strict;    # things are likely to be sloppy
 
 $code
+}
 END_CODE
 
-    }
-
-    return $code;
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,6 +187,8 @@ sub parse {
     return $output;
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~,
+
 sub extract_snippets {
     my( $self, $file ) = @_;
 
@@ -228,57 +226,22 @@ END_TESTS
 
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 sub runtest {
-    my( $self, $file, $group ) = @_;
+    my ( $self, @args ) = @_;
 
-    my $filename_call = not ref $file;
+    my $code = $self->generate_test( @args );
 
-    if( $filename_call and not -f $file ) {
-        croak "$file doesn't seem to exist";
-    }
-
-    my $output;
-    open my $fh, '>', \$output;
-
-    if ( $filename_call ) {
-        $parser_of[ $$self ]->parse_from_file( $file, $fh );
-    } 
-    else {
-        $parser_of[ $$self ]->parse_from_filehandle( $file, $fh );
-    }
-
-    my $filename = $filename_call ? $file : 'unknown';
-
-    use Test::Group;
-
-    my $group_b = 'Test::Group::test "blah" => sub { ' x !! $group;
-
-    my $group_e = '}' x !! $group;
-
-    my $sub = eval <<END_TEST;
-$group_b
-    sub {
-    use Test::More;
-    no strict;
-    no warnings;
-
-    ok 1, 'the test compile';
-
-$output
-
-    ok 1, 'we reached the end';
-
-$group_e
-}
-END_TEST
+    print $code and die;;
+    eval $code;
 
     if ( $@ ) {
         croak "couldn't compile test: $@";
     }
-
-    $sub->();
-
 }
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 sub snippets_ok {
     my( $self, $file ) = @_;
@@ -292,6 +255,7 @@ sub snippets_ok {
     return not $@;
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1; # End of Test::Pod::Snippets
 
@@ -421,28 +385,30 @@ the following options:
 
 =over
 
-=item extract_verbatim_bits => $boolean 
+=item verbatim => I<$boolean>
 
-If set to true, extracts all verbatim text from the pod. 
+If set to true, incorporates the pod's verbatim parts to the test.
 
 Set to true by default.
 
-=item extract_functions => $boolean
+=item functions => I<$boolean>
 
 If set to true, extracts function definitions from the pod.
 More specifically, Test::Pod::Snippets looks for a pod section 
-called FUNCTIONS, and assumes the title of all its direct
+called FUNCTIONS, and assumes the title of all its 
 subsections to be functions. 
 
 For example, the pod
 
+=for test ignore
+
     =head1 FUNCTIONS
 
-    =head2 play_song( $artist, $song_title )
+    =head2 play_song( I<$artist>, I<$song_title> )
 
     Play $song_title from $artist.
 
-    =head2 set_lighting( $intensity )
+    =head2 set_lighting( I<$intensity> )
 
     Set the room's light intensity (0 is pitch black 
     and 1 is supernova white, -1 triggers the stroboscope).
@@ -454,12 +420,15 @@ would generate the code
 
 Pod markups are automatically stripped from the headers. 
 
-=item extract_methods  => $boolean
+=for test
 
-Same as I<extract_functions>, but with methods. In this
+=item methods  => I<$boolean>
+
+Same as C<functions>, but with methods. In this
 case, Test::Pod::Snippets looks for a pod section called METHODS.
-The object used for the tests is assumed to be '$thingy',
-and its class to be given by the variable '$class'.
+The object used for the tests is assumed to be '$thingy' 
+(but can be overriden using the argument C<object_name>,
+and its class must be given by a variable '$class'.
 
 For example, the pod
 
@@ -482,10 +451,32 @@ will produces
     $thingy = $class->new( $name );
     @result = $thingy->jump( $how_far );
 
+=item object_name => I<$identifier>
 
-
+The name of the object (with the leading '$') to be
+used for the methods if the T:P:S object is set to 
+extract methods.
 
 =back
+
+=item is_extracting_verbatim
+
+=item is_extracting_functions
+
+=item is_extracting_methods
+
+Returns true if the object is configured to
+extract that part of the pod, false otherwise.
+
+=item extracts_verbatim( I<$boolean> )
+
+=item extracts_functions( I<$boolean> )
+
+=item extracts_methods( I<$boolean> )
+
+Configure the object to extract (or not) the given
+pod parts.
+
 
 =head2 generate_test( $input_type => I<$input>, %options )
 
@@ -502,8 +493,9 @@ The method accepts the following options:
 
 =item standalone => I<$boolean>
 
-If standalone is true (which is the default), the generated
-code will be a self-sufficient test script.
+If standalone is true, the generated
+code will be a self-sufficient test script. 
+Defaults to 'false'.
 
     # create a test script out of the module Foo::Bar
     open my $test_fh, '>', 't/foo-bar.t' or die;
@@ -526,29 +518,16 @@ very beginning and end of the extracted code, like so:
 If true, the extracted code will be wrapped in a L<Test::Group> 
 test, which will report a single 'ok' for the whole series of test
 (but will give more details if something goes wrong).  Is set
-to 'false' bu default.
+to 'false' by default.
 
 =back
 
+=head2 runtest( $input_type => I<$input>, %options )
 
-=head2 generate_snippets
+Does the same than C<generate_test>, except that it 
+executes the generated code rather than return it. 
+The arguments are treated the same as for C<generate_test>.
 
-    $tps->generate_snippets( @source_files )
-
-=for test ;    
-
-For each file in I<@source_files>, extracts the code snippets from
-the pod found within and create the test file F<t/code-snippets-xx.t>.
-
-=head2 extract_snippets 
-
-=for test
-    $file = 'lib/Test/Pod/Snippets.pm';
-
-    $test_script = $tps->extract_snippets( $file )
-
-Returns the code of a test script containing the code snippets found
-in I<$file>.
 
 =head1 AUTHOR
 
@@ -559,8 +538,14 @@ Yanick Champoux, C<< <yanick at cpan.org> >>
 Please report any bugs or feature requests to
 C<bug-test-pod-snippets at rt.cpan.org>, or through the web interface at
 L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Test-Pod-Snippets>.
-I will be notified, and then you'll automatically be notified of progress on
-your bug as I make changes.
+
+=head1 REPOSITORY
+
+The code of this module is tracked via a Git repository.
+
+Git url:  git://babyl.dyndns.org/test-code-snippets.git
+
+Web interface:  http://babyl.dyndns.org/git/test-code-snippets.git
 
 =head1 SUPPORT
 
@@ -594,7 +579,7 @@ L<http://search.cpan.org/dist/Test-Pod-Snippets>
 
 =head1 SEE ALSO
 
-L<pod2snippets>
+L<podsnippets>
 
 =head2 Test::Inline
 
