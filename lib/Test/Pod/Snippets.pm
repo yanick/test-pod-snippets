@@ -117,6 +117,7 @@ sub generate_test {
     }
 
     if( $param{sanity_tests} ) {
+        no warnings qw/ uninitialized /;
        $code = <<"END_CODE";
 ok 1 => 'the tests compile';   
 
@@ -503,20 +504,20 @@ extract methods.
 
 =back
 
-=item is_extracting_verbatim
+=head2 is_extracting_verbatim
 
-=item is_extracting_functions
+=head2 is_extracting_functions
 
-=item is_extracting_methods
+=head2 is_extracting_methods
 
 Returns true if the object is configured to
 extract that part of the pod, false otherwise.
 
-=item extracts_verbatim( I<$boolean> )
+=head2 extracts_verbatim( I<$boolean> )
 
-=item extracts_functions( I<$boolean> )
+=head2 extracts_functions( I<$boolean> )
 
-=item extracts_methods( I<$boolean> )
+=head2 extracts_methods( I<$boolean> )
 
 Configure the object to extract (or not) the given
 pod parts.
