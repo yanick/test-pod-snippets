@@ -1,5 +1,8 @@
 Revision history for Test-Pod-Snippets
 
+0.05 Tue Aug 5
+    * Indexer not happy with 0.04.01. :-(
+
 0.04.01 Tue Aug 5 2008
     * removed leftover debugging statement in runtest().
 
