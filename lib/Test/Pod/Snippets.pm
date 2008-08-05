@@ -34,6 +34,12 @@ my @do_functions :Field
                  :Get(is_extracting_functions)
                  :Set(extracts_functions)
                  ;
+
+my @preserve_lines :Field
+                   :Default(1)
+                   :Arg(preserve_lines)
+                   :Std(preserve_lines)
+                   ;
 #>>>
                  
 my @object_name  :Field :Default('$thingy') :Arg(object_name);
@@ -500,6 +506,12 @@ will produces
 The name of the object (with the leading '$') to be
 used for the methods if the T:P:S object is set to 
 extract methods.
+
+=item preserve_lines => I<$boolean>
+
+If sets to true (which is the default), the generated code
+will be peppered with '#line' pre-compiler lines that will
+have any failing test point to the test's original file.
 
 =back
 

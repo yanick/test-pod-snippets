@@ -96,10 +96,13 @@ sub command {
             }
         }
 
+        my $line_ref;
+        $line_ref = "\n#line $line_nbr " . ( $parser->input_file || 'unknown')
+                    . "\n"
+            if $parser->{tps}->get_preserve_lines;
+
         print {$parser->output_handle} 
-            "\n#line $line_nbr ", 
-            ( $parser->input_file || 'unknown' ),
-            "\n",
+            $line_ref,
             '@result = ', $paragraph, ";\n";
     }
 }
@@ -133,7 +136,8 @@ sub print_paragraph {
     $paragraph =~ /^(\s*)/;
     my $indent = $1;
     $paragraph =~ s/^$indent//mg;
-    $paragraph = "\n#line $line_no $filename\n".$paragraph;
+    $paragraph = "\n#line $line_no $filename\n".$paragraph 
+        if $parser->{tps}->get_preserve_lines;
 
     $paragraph .= ";\n";
 

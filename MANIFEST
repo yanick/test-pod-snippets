@@ -16,3 +16,4 @@ Makefile.PL
 script/test-pod-snippets.PL
 t/new.t
 t/runtest.t
+t/preserve_lines.t
