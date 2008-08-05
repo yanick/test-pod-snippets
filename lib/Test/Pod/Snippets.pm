@@ -234,7 +234,6 @@ sub runtest {
 
     my $code = $self->generate_test( @args );
 
-    print $code and die;;
     eval $code;
 
     if ( $@ ) {
