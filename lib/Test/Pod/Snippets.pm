@@ -603,9 +603,9 @@ L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Test-Pod-Snippets>.
 
 The code of this module is tracked via a Git repository.
 
-Git url:  git://babyl.dyndns.org/test-code-snippets.git
+Git url:  git://babyl.dyndns.org/test-pod-snippets.git
 
-Web interface:  http://babyl.dyndns.org/git/test-code-snippets.git
+Web interface:  http://babyl.dyndns.org/git/test-pod-snippets.git
 
 =head1 SUPPORT
 
