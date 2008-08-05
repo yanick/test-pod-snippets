@@ -1,5 +1,8 @@
 Revision history for Test-Pod-Snippets
 
+0.04.01 Tue Aug 5 2008
+    * removed leftover debugging statement in runtest().
+
 0.04  Mon Aug  4 18:25:39 EDT 2008
     * Added Module::Locate dependency.
     * Changed the API quite a bit.
