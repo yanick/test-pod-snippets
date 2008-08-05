@@ -13,7 +13,7 @@ my $builder = Module::Build->new(
         'Object::InsideOut' => 0,
         'Module::Locate'    => 0,
     },
-    sign                => 1,
+#    sign                => 1,
     add_to_cleanup      => [ 'Test-Pod-Snippets-*', 't/pod-snippets-*.t' ],
     create_makefile_pl  => 'passthrough',
     script_files        => [ qw/ podsnippets  / ],
