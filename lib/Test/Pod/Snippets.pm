@@ -276,7 +276,7 @@ sub generate_test_file {
         my $name;
         do { 
             $i++; 
-            $name = sprintf "tps-%04d.t", $i 
+            $name = sprintf 'tps-%04d.t', $i 
         } while -f $name;
 
         $param{output} = $name;
@@ -286,7 +286,7 @@ sub generate_test_file {
 
     croak "file '$filename' already exists" if -f $filename;
 
-    open my $fh, '>', $filename 
+    open my $fh, '>', $filename
         or croak "can't create file '$filename': $!";
 
     delete $param{output};
