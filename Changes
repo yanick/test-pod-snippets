@@ -1,5 +1,7 @@
 Revision history for Test-Pod-Snippets
 
+{{$NEXT}}
+    * Change Object::InsideOut for Moose.
 
 0.06 Tue Aug 5 2008
     * Add Params::Validate as a dependency.

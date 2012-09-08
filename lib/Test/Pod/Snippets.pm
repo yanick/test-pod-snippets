@@ -4,66 +4,51 @@ use warnings;
 use strict;
 use Carp;
 
-use Object::InsideOut;
+use Moose;
+use MooseX::SemiAffordanceAccessor;
+
 use Test::Pod::Snippets::Parser;
 use Module::Locate qw/ locate /;
 use Params::Validate qw/ validate_with validate /;
 
 our $VERSION = '0.06';
 
-#<<<
-my @parser_of   :Field :Get(parser);
+has parser => (
+    is => 'ro',
+    default => sub {
+        my $tps = Test::Pod::Snippets::Parser->new;
+        $tps->{tps} = shift;
+        return $tps;
+    },
+);
 
-my @do_verbatim  :Field 
-                 :Default(1)         
-                 :Arg(verbatim)  
-                 :Get(is_extracting_verbatim)
-                 :Set(extracts_verbatim)
-                 ;
+has verbatim => (
+    reader => 'is_extracting_verbatim',
+    writer => 'extracts_verbatim',
+    default => 1,
+);
 
-my @do_methods   :Field 
-                 :Default(0)         
-                 :Arg(methods)   
-                 :Get(is_extracting_methods)
-                 :Set(extracts_methods)
-                 ;
+has methods => (
+    reader => 'is_extracting_methods',
+    writer => 'extracts_methods',
+    default => 0,
+);
 
-my @do_functions :Field 
-                 :Default(0)         
-                 :Arg(functions)
-                 :Get(is_extracting_functions)
-                 :Set(extracts_functions)
-                 ;
+has functions => (
+    reader => 'is_extracting_functions',
+    writer => 'extracts_functions',
+    default => 0,
+);
 
-my @preserve_lines :Field
-                   :Default(1)
-                   :Arg(preserve_lines)
-                   :Std(preserve_lines)
-                   ;
-#>>>
-                 
-my @object_name  :Field :Default('$thingy') :Arg(object_name);
+has preserve_lines => (
+    is => 'rw',
+    default => 1,
+);
 
-sub _init :Init {
-    my $self = shift;
-
-    $self->init_parser;
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub init_parser {
-    my $self = shift;
-    $parser_of[ $$self ] = Test::Pod::Snippets::Parser->new;
-    $parser_of[ $$self ]->{tps} = $self;
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub get_object_name {
-    my $self = shift;
-    return $object_name[ $$self ];
-}
+has object_name => (
+    is => 'ro',
+    default => '$thingy',
+);
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -179,8 +164,6 @@ sub parse {
         $type = 'file';
     }
 
-    $self->init_parser;
-
     if ( $type eq 'file' ) {
         $self->parser->parse_from_file( $input, $output_fh );
     }
@@ -209,10 +192,10 @@ sub extract_snippets {
     open my $fh, '>', \$output;
 
     if ( $filename_call ) {
-        $parser_of[ $$self ]->parse_from_file( $file, $fh );
+        $self->parser->parse_from_file( $file, $fh );
     } 
     else {
-        $parser_of[ $$self ]->parse_from_filehandle( $file, $fh );
+        $self->parser->parse_from_filehandle( $file, $fh );
     }
 
     my $filename = $filename_call ? $file : 'unknown';

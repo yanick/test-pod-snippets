@@ -92,14 +92,14 @@ sub command {
                 return;
             }
             else {
-                $paragraph = $parser->{tps}->get_object_name.'->'.$paragraph;
+                $paragraph = $parser->{tps}->object_name.'->'.$paragraph;
             }
         }
 
         my $line_ref;
         $line_ref = "\n#line $line_nbr " . ( $parser->input_file || 'unknown')
                     . "\n"
-            if $parser->{tps}->get_preserve_lines;
+            if $parser->{tps}->preserve_lines;
 
         print {$parser->output_handle} 
             $line_ref,
@@ -137,7 +137,7 @@ sub print_paragraph {
     my $indent = $1;
     $paragraph =~ s/^$indent//mg;
     $paragraph = "\n#line $line_no $filename\n".$paragraph 
-        if $parser->{tps}->get_preserve_lines;
+        if $parser->{tps}->preserve_lines;
 
     $paragraph .= ";\n";
 
