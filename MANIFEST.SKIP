@@ -8,6 +8,8 @@ version.files
 .*\.swp
 issues
 .*~$
-Test-Pod-Snippets-.*\.tar\.gz
+Test-Pod-Snippets-.*
 perversionrc
 .releaserc
+dist.ini
+sanity

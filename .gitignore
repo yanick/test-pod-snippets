@@ -7,3 +7,6 @@ META.yml
 Makefile.PL
 Test-Pod-Snippets-*.tar.gz
 Test-Pod-Snippets*
+sanity
+.build/
+*.perlcritic-history

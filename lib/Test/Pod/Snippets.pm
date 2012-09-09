@@ -1,4 +1,5 @@
 package Test::Pod::Snippets;
+# ABSTRACT: Generate tests from pod code snippets
 
 use warnings;
 use strict;
@@ -7,11 +8,8 @@ use Carp;
 use Moose;
 use MooseX::SemiAffordanceAccessor;
 
-use Test::Pod::Snippets::Parser;
 use Module::Locate qw/ locate /;
 use Params::Validate qw/ validate_with validate /;
-
-our $VERSION = '0.06';
 
 has parser => (
     is => 'ro',
@@ -279,16 +277,159 @@ sub generate_test_file {
     return $filename;
 }
 
+1;
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+package   # hide from PAUSE
+    Test::Pod::Snippets::Parser;
 
-1; # End of Test::Pod::Snippets
+use strict;
+use warnings;
 
+no warnings 'redefine';
+
+use parent qw/ Pod::Parser /;
+
+sub initialize {
+    $_[0]->SUPER::initialize;
+    $_[0]->{$_} = 0 for qw/ tps_ignore tps_ignore_all tps_within_begin_test /;
+    $_[0]->{tps_method_level} = 0;
+    $_[0]->{tps_function_level} = 0;
+}
+
+sub command {
+    my ($parser, $command, $paragraph, $line_nbr ) = @_;
+
+    my $filename = $parser->input_file || 'unknown';
+
+    if ( $command eq 'for' ) {
+        my( $target, $directive, $rest ) = split ' ', $paragraph, 3;
+
+        return unless $target eq 'test';
+
+        return $parser->{tps_ignore}     = 1 if $directive eq 'ignore';
+        return $parser->{tps_ignore_all} = 1 if $directive eq 'ignore_all';
+
+        $parser->{tps_ignore} = 0;
+        no warnings qw/ uninitialized /;
+        print {$parser->output_handle} join ' ', $directive, $rest;
+    }
+    elsif( $command eq 'begin' ) {
+        my( $target, $rest ) = split ' ', $paragraph, 2;
+        return unless $target eq 'test';
+        $parser->{tps_within_begin_test} = 1;
+        print {$parser->output_handle} $rest;
+    }
+    elsif( $command eq 'end' ) {
+        my( $target, $rest ) = split ' ', $paragraph, 2;
+        return unless $target eq 'test';
+
+        $parser->{tps_within_begin_test} = 0;
+    }
+    elsif( $command =~ /^head(\d+)/ ) {
+
+        return unless $parser->{tps}->is_extracting_functions 
+                   or $parser->{tps}->is_extracting_methods;
+
+        my $level = $1;
+
+        for my $type ( qw/ tps_method_level tps_function_level / ) {
+            if ( $level <= $parser->{$type} ) {
+                $parser->{$type} = 0;
+            }
+        }
+
+        if ( $paragraph =~ /^\s*METHODS\s*$/ ) {
+            $parser->{tps_method_level} =
+                $parser->{tps}->is_extracting_methods && $level;
+            return;
+        }
+
+        if ( $paragraph =~ /^\s*FUNCTIONS\s*$/ ) {
+            $parser->{tps_function_level} = 
+                $parser->{tps}->is_extracting_functions && $level;
+            return;
+        }
+
+        return if $parser->{tps_ignore} or $parser->{tps_ignore_all};
+
+        my $master_level =  $parser->{tps_method_level} 
+                         || $parser->{tps_function_level}
+                         || return ;
+
+        # functions and methods are deeper than
+        # their main header
+        return unless $level > $master_level; 
+
+        $paragraph =~ s/[IBC]<(.*?)>/$1/g;  # remove markups
+
+        $paragraph =~ s/^\s+//;
+        $paragraph =~ s/\s+$//;
+
+        if ( $parser->{tps_method_level} ) {
+            if ( $paragraph =~ /^new/ ) {
+                print {$parser->output_handle}
+                    $parser->{tps}->get_object_name,
+                    ' = $class->', $paragraph, ";\n";
+                return;
+            }
+            else {
+                $paragraph = $parser->{tps}->object_name.'->'.$paragraph;
+            }
+        }
+
+        my $line_ref;
+        $line_ref = "\n#line $line_nbr " . ( $parser->input_file || 'unknown')
+                    . "\n"
+            if $parser->{tps}->preserve_lines;
+
+        print {$parser->output_handle} 
+            $line_ref,
+            '@result = ', $paragraph, ";\n";
+    }
+}
+
+sub textblock {
+    return unless $_[0]->{tps_within_begin_test};
+
+    print_paragraph( @_ ); 
+}
+
+sub interior_sequence {}
+
+sub verbatim {
+    my $self = shift;
+
+    return unless $self->{tps}->is_extracting_verbatim;
+
+    return if ( $self->{tps_ignore} or $self->{tps_ignore_all} ) 
+           and not $self->{tps_within_begin_test};
+
+    print_paragraph( $self, @_ ); 
+}
+
+sub print_paragraph {
+    my ( $parser, $paragraph, $line_no ) = @_;
+
+    $DB::single = 1;
+    my $filename = $parser->input_file || 'unknown';
+
+    # remove the indent
+    $paragraph =~ /^(\s*)/;
+    my $indent = $1;
+    $paragraph =~ s/^$indent//mg;
+    $paragraph = "\n#line $line_no $filename\n".$paragraph 
+        if $parser->{tps}->preserve_lines;
+
+    $paragraph .= ";\n";
+
+    print {$parser->output_handle} $paragraph;
+}
+
+
+'end of Test::Pod::Snippets::Parser';
 __END__
 
-=head1 NAME
-
-Test::Pod::Snippets - Generate tests from pod code snippets
+=for test ignore
 
 =head1 SYNOPSIS
 
@@ -302,6 +443,7 @@ Test::Pod::Snippets - Generate tests from pod code snippets
 
     $tps->runtest( module => $_, testgroup => 1 ) for @modules;
 
+=for test
 
 =head1 DESCRIPTION
 
@@ -453,8 +595,6 @@ would generate the code
 
 Pod markups are automatically stripped from the headers. 
 
-=for test
-
 =item methods  => I<$boolean>
 
 Same as C<functions>, but with methods. In this
@@ -583,54 +723,6 @@ executes the generated code rather than return it.
 The arguments are treated the same as for C<generate_test>.
 
 
-=head1 AUTHOR
-
-Yanick Champoux, C<< <yanick at cpan.org> >>
-
-=head1 BUGS
-
-Please report any bugs or feature requests to
-C<bug-test-pod-snippets at rt.cpan.org>, or through the web interface at
-L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Test-Pod-Snippets>.
-
-=head1 REPOSITORY
-
-The code of this module is tracked via a Git repository.
-
-Git url:  git://babyl.dyndns.org/test-pod-snippets.git
-
-Web interface:  http://babyl.dyndns.org/git/test-pod-snippets.git
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-=for test ignore
-
-    perldoc Test::Pod::Snippets
-
-You can also look for information at:
-
-=over 4
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/Test-Pod-Snippets>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/Test-Pod-Snippets>
-
-=item * RT: CPAN's request tracker
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Test-Pod-Snippets>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/Test-Pod-Snippets>
-
-=back
-
 =head1 SEE ALSO
 
 L<podsnippets>
@@ -668,13 +760,6 @@ is equivalent to this code, using I<Test::Inline>:
     is $x => 'CAN YOU HEAR ME NOW?';
     =end testing
 
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright 2006, 2007, 2008 Yanick Champoux, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
 
 =cut
 
