@@ -1,6 +1,8 @@
 Revision history for Test-Pod-Snippets
 
 {{$NEXT}}
+
+0.07      2012-09-09
     * Change Object::InsideOut for Moose.
     * Move release maintenance to Dist::Zilla
 
