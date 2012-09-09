@@ -1,9 +1,0 @@
-Summary: adding arguments to podsnippets 
-Status: New
-CreatedBy: Name <me@example.com>
-AssignedTo: 
-Inserted: 2008-08-04T21:28:27
-Updated: 2008-08-04T21:28:50
-
--man, -help, -version
-

@@ -1,71 +1,61 @@
 package Test::Pod::Snippets;
+BEGIN {
+  $Test::Pod::Snippets::AUTHORITY = 'cpan:YANICK';
+}
+{
+  $Test::Pod::Snippets::VERSION = '0.07';
+}
+# ABSTRACT: Generate tests from pod code snippets
 
 use warnings;
 use strict;
 use Carp;
 
-use Object::InsideOut;
-use Test::Pod::Snippets::Parser;
+use Moose;
+use MooseX::SemiAffordanceAccessor;
+
 use Module::Locate qw/ locate /;
 use Params::Validate qw/ validate_with validate /;
 
-our $VERSION = '0.06';
+has parser => (
+    is => 'ro',
+    default => sub {
+        my $tps = Test::Pod::Snippets::Parser->new;
+        $tps->{tps} = shift;
+        return $tps;
+    },
+);
 
-#<<<
-my @parser_of   :Field :Get(parser);
+has verbatim => (
+    reader => 'is_extracting_verbatim',
+    writer => 'extracts_verbatim',
+    default => 1,
+);
 
-my @do_verbatim  :Field 
-                 :Default(1)         
-                 :Arg(verbatim)  
-                 :Get(is_extracting_verbatim)
-                 :Set(extracts_verbatim)
-                 ;
+has methods => (
+    reader => 'is_extracting_methods',
+    writer => 'extracts_methods',
+    default => 0,
+);
 
-my @do_methods   :Field 
-                 :Default(0)         
-                 :Arg(methods)   
-                 :Get(is_extracting_methods)
-                 :Set(extracts_methods)
-                 ;
+has functions => (
+    reader => 'is_extracting_functions',
+    writer => 'extracts_functions',
+    default => 0,
+);
 
-my @do_functions :Field 
-                 :Default(0)         
-                 :Arg(functions)
-                 :Get(is_extracting_functions)
-                 :Set(extracts_functions)
-                 ;
+has preserve_lines => (
+    is => 'rw',
+    default => 1,
+);
 
-my @preserve_lines :Field
-                   :Default(1)
-                   :Arg(preserve_lines)
-                   :Std(preserve_lines)
-                   ;
-#>>>
-                 
-my @object_name  :Field :Default('$thingy') :Arg(object_name);
-
-sub _init :Init {
-    my $self = shift;
-
-    $self->init_parser;
-}
+has object_name => (
+    is => 'ro',
+    default => '$thingy',
+);
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-sub init_parser {
-    my $self = shift;
-    $parser_of[ $$self ] = Test::Pod::Snippets::Parser->new;
-    $parser_of[ $$self ]->{tps} = $self;
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub get_object_name {
-    my $self = shift;
-    return $object_name[ $$self ];
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 sub generate_snippets {
     my( $self, @files ) = @_;
@@ -82,14 +72,6 @@ sub generate_snippets {
         print {$fh} $self->extract_snippets( $_ );
         close $fh;
     }
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub extract_from_string {
-    my ( $self, $string ) = @_;
-    open my $pod_fh, '<', \$string;
-    return $self->extract_snippets( $pod_fh );
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -116,7 +98,7 @@ sub generate_test {
         croak "can only accept one of those parameters: @type";
     }
 
-    my $code = $self->parse( $type[0], $param{ $type[0] } );
+    my $code = $self->_parse( $type[0], $param{ $type[0] } );
 
     if ($param{standalone} or $param{testgroup} ) {
         $param{sanity_tests} = 1;
@@ -159,7 +141,7 @@ END_CODE
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-sub parse {
+sub _parse {
     my ( $self, $type, $input ) = @_;
 
     my $output;
@@ -179,8 +161,6 @@ sub parse {
         $type = 'file';
     }
 
-    $self->init_parser;
-
     if ( $type eq 'file' ) {
         $self->parser->parse_from_file( $input, $output_fh );
     }
@@ -194,28 +174,38 @@ sub parse {
     return $output;
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~,
 
-sub extract_snippets {
+sub extract_snippets_from_file {
     my( $self, $file ) = @_;
 
-    my $filename_call = 'GLOB' ne ref $file;
-
-    if( $filename_call and not -f $file ) {
+    if( not -f $file ) {
         croak "$file doesn't seem to exist";
     }
 
     my $output;
     open my $fh, '>', \$output;
 
-    if ( $filename_call ) {
-        $parser_of[ $$self ]->parse_from_file( $file, $fh );
-    } 
-    else {
-        $parser_of[ $$self ]->parse_from_filehandle( $file, $fh );
-    }
+    $self->parser->parse_from_file( $file, $fh );
 
-    my $filename = $filename_call ? $file : 'unknown';
+    return $self->_extract($output);
+}
+
+
+sub extract_snippets {
+    my( $self, $pod ) = @_;
+
+    open my $file, '<', \$pod;
+
+    my $output;
+    open my $fh, '>', \$output;
+
+    $self->parser->parse_from_filehandle( $file, $fh );
+
+    return $self->_extract($output);
+}
+
+sub _extract {
+    my( $self, $output ) = @_;
 
     return <<"END_TESTS";
 use Test::More qw/ no_plan /;
@@ -249,6 +239,7 @@ sub runtest {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 sub snippets_ok {
     my( $self, $file ) = @_;
 
@@ -276,7 +267,7 @@ sub generate_test_file {
         my $name;
         do { 
             $i++; 
-            $name = sprintf "tps-%04d.t", $i 
+            $name = sprintf 'tps-%04d.t', $i 
         } while -f $name;
 
         $param{output} = $name;
@@ -286,7 +277,7 @@ sub generate_test_file {
 
     croak "file '$filename' already exists" if -f $filename;
 
-    open my $fh, '>', $filename 
+    open my $fh, '>', $filename
         or croak "can't create file '$filename': $!";
 
     delete $param{output};
@@ -296,16 +287,165 @@ sub generate_test_file {
     return $filename;
 }
 
+1;
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+package   # hide from PAUSE
+    Test::Pod::Snippets::Parser;
 
-1; # End of Test::Pod::Snippets
+use strict;
+use warnings;
 
-__END__
+no warnings 'redefine';
+
+use parent qw/ Pod::Parser /;
+
+sub initialize {
+    $_[0]->SUPER::initialize;
+    $_[0]->{$_} = 0 for qw/ tps_ignore tps_ignore_all tps_within_begin_test /;
+    $_[0]->{tps_method_level} = 0;
+    $_[0]->{tps_function_level} = 0;
+}
+
+sub command {
+    my ($parser, $command, $paragraph, $line_nbr ) = @_;
+
+    if ( $command eq 'for' ) {
+        my( $target, $directive, $rest ) = split ' ', $paragraph, 3;
+
+        return unless $target eq 'test';
+
+        return $parser->{tps_ignore}     = 1 if $directive eq 'ignore';
+        return $parser->{tps_ignore_all} = 1 if $directive eq 'ignore_all';
+
+        $parser->{tps_ignore} = 0;
+        no warnings qw/ uninitialized /;
+        print {$parser->output_handle} join ' ', $directive, $rest;
+    }
+    elsif( $command eq 'begin' ) {
+        my( $target, $rest ) = split ' ', $paragraph, 2;
+        return unless $target eq 'test';
+        $parser->{tps_within_begin_test} = 1;
+        print {$parser->output_handle} $rest;
+    }
+    elsif( $command eq 'end' ) {
+        my( $target ) = split ' ', $paragraph, 2;
+        return unless $target eq 'test';
+
+        $parser->{tps_within_begin_test} = 0;
+    }
+    elsif( $command =~ /^head(\d+)/ ) {
+
+        return unless $parser->{tps}->is_extracting_functions 
+                   or $parser->{tps}->is_extracting_methods;
+
+        my $level = $1;
+
+        for my $type ( qw/ tps_method_level tps_function_level / ) {
+            if ( $level <= $parser->{$type} ) {
+                $parser->{$type} = 0;
+            }
+        }
+
+        if ( $paragraph =~ /^\s*METHODS\s*$/ ) {
+            $parser->{tps_method_level} =
+                $parser->{tps}->is_extracting_methods && $level;
+            return;
+        }
+
+        if ( $paragraph =~ /^\s*FUNCTIONS\s*$/ ) {
+            $parser->{tps_function_level} = 
+                $parser->{tps}->is_extracting_functions && $level;
+            return;
+        }
+
+        return if $parser->{tps_ignore} or $parser->{tps_ignore_all};
+
+        my $master_level =  $parser->{tps_method_level} 
+                         || $parser->{tps_function_level}
+                         || return ;
+
+        # functions and methods are deeper than
+        # their main header
+        return unless $level > $master_level; 
+
+        $paragraph =~ s/[IBC]<(.*?)>/$1/g;  # remove markups
+
+        $paragraph =~ s/^\s+//;
+        $paragraph =~ s/\s+$//;
+
+        if ( $parser->{tps_method_level} ) {
+            if ( $paragraph =~ /^new/ ) {
+                print {$parser->output_handle}
+                    $parser->{tps}->get_object_name,
+                    ' = $class->', $paragraph, ";\n";
+                return;
+            }
+            else {
+                $paragraph = $parser->{tps}->object_name.'->'.$paragraph;
+            }
+        }
+
+        my $line_ref;
+        $line_ref = "\n#line $line_nbr " . ( $parser->input_file || 'unknown')
+                    . "\n"
+            if $parser->{tps}->preserve_lines;
+
+        print {$parser->output_handle} 
+            $line_ref,
+            '@result = ', $paragraph, ";\n";
+    }
+}
+
+sub textblock {
+    return unless $_[0]->{tps_within_begin_test};
+
+    print_paragraph( @_ ); 
+}
+
+sub interior_sequence {}
+
+sub verbatim {
+    my $self = shift;
+
+    return unless $self->{tps}->is_extracting_verbatim;
+
+    return if ( $self->{tps_ignore} or $self->{tps_ignore_all} ) 
+           and not $self->{tps_within_begin_test};
+
+    print_paragraph( $self, @_ ); 
+}
+
+sub print_paragraph {
+    my ( $parser, $paragraph, $line_no ) = @_;
+
+    $DB::single = 1;
+    my $filename = $parser->input_file || 'unknown';
+
+    # remove the indent
+    $paragraph =~ /^(\s*)/;
+    my $indent = $1;
+    $paragraph =~ s/^$indent//mg;
+    $paragraph = "\n#line $line_no $filename\n".$paragraph 
+        if $parser->{tps}->preserve_lines;
+
+    $paragraph .= ";\n";
+
+    print {$parser->output_handle} $paragraph;
+}
+
+
+'end of Test::Pod::Snippets::Parser';
+
+
+=pod
 
 =head1 NAME
 
 Test::Pod::Snippets - Generate tests from pod code snippets
+
+=head1 VERSION
+
+version 0.07
 
 =head1 SYNOPSIS
 
@@ -319,10 +459,9 @@ Test::Pod::Snippets - Generate tests from pod code snippets
 
     $tps->runtest( module => $_, testgroup => 1 ) for @modules;
 
-
 =head1 DESCRIPTION
 
-=over 
+=over
 
 =item Fact 1
 
@@ -346,89 +485,9 @@ Test::Pod::Snippets's goal is to address those issues. Quite simply,
 it extracts verbatim text off pod documents -- which it assumes to be 
 code snippets -- and generate test files out of them.
 
-=head1 HOW TO USE TEST::POD::SNIPPETS IN YOUR DISTRIBUTION
-
-The easiest way is to create a test.t file calling Test::Pod::Snippets
-as shown in the synopsis.  If, however, you don't want to 
-add T:P:S to your module's dependencies, you can 
-add the following to your Build.PL:
-
-=for test ignore
-
-  my $builder = Module::Build->new(
-    # ... your M::B parameters
-    PL_files  => { 'script/test-pod-snippets.PL' => q{}  },
-    add_to_cleanup      => [ 't/tps-*.t' ],
-  );
-
-Then create the file F<script/test-pod-snippets.PL>, which should contains
-
-    use Test::Pod::Snippets;
-
-    my $tps = Test::Pod::Snippets->new;
-
-    my @files = qw#
-        lib/your/module.pm
-        lib/your/documentation.pod
-    #;
-    
-    print "generating tps tests...\n";
-    print $tps->generate_test_file( $_ ), "created\n" for @files;
-    print "done\n";
-
-=for test
-
-And you're set! Running B<Build> should now generate one test file
-for each given file.
-
-=head1 SYNTAX
-
-By default, Test::Pod::Snippets considers all verbatim pod text to be 
-code snippets. To tell T::P::S to ignore subsequent pieces of verbatim text,
-add a C<=for test ignore> to the pod. Likely, to return to the normal behavior, 
-insert C<=for test>. For example:
-
-=for test ignore
-
-    A sure way to make your script die is to do:
-
-    =for test ignore
-
-        $y = 0; $x = 1/$y;
-
-    The right (or safe) way to do it is rather:
-
-    =for test
-
-        $y = 0; $x = eval { 1/$y };
-        warn $@ if $@;
-
-
-C<=for test> and C<=begin test ... =end test> can also be used to
-add code that should be include in the tests but not in the documentation.
-
-Example:
-
-    The right way to do it is:
-
-        $y = 0; $x = eval { 1/$y };
-
-        =for test
-           # make sure an error happened
-           is $x => undef;
-           ok length($@), 'error is reported';
-
-=for test
-
-=begin test
-
-ok 1 => 'begin works!';
-
-=end test
-
 =head1 METHODS
 
-=head2 new( I< %options > )
+=head2 new( %options )
 
 Creates a new B<Test::Pod::Snippets> object. The method accepts
 the following options:
@@ -450,8 +509,6 @@ subsections to be functions.
 
 For example, the pod
 
-=for test ignore
-
     =head1 FUNCTIONS
 
     =head2 play_song( I<$artist>, I<$song_title> )
@@ -469,8 +526,6 @@ would generate the code
     @result = set_lightning( $intensity );
 
 Pod markups are automatically stripped from the headers. 
-
-=for test
 
 =item methods  => I<$boolean>
 
@@ -533,7 +588,6 @@ extract that part of the pod, false otherwise.
 Configure the object to extract (or not) the given
 pod parts.
 
-
 =head2 generate_test( $input_type => I<$input>, %options )
 
 Extracts the pod off I<$input> and generate tests out of it.
@@ -592,61 +646,96 @@ C<generate_test>.
 
 Returns the name of the created file.
 
-
 =head2 runtest( $input_type => I<$input>, %options )
 
 Does the same than C<generate_test>, except that it 
 executes the generated code rather than return it. 
 The arguments are treated the same as for C<generate_test>.
 
+=head2 generate_snippets( @filenames )
 
-=head1 AUTHOR
+For each file in I<@filenames>, generates a I<pod-snippets-X.t>
+file in the C<t/> directory.
 
-Yanick Champoux, C<< <yanick at cpan.org> >>
+=head2 extract_snippets_from_file( $filename )
 
-=head1 BUGS
+Extracts the snippets from the file and returns a string containing
+the generated tests.
 
-Please report any bugs or feature requests to
-C<bug-test-pod-snippets at rt.cpan.org>, or through the web interface at
-L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Test-Pod-Snippets>.
+=head2 extract_snippets( $pod )
 
-=head1 REPOSITORY
+Extracts the snippets from the string I<$pod> and
+returns a string containing the generated tests.
 
-The code of this module is tracked via a Git repository.
+=head2 snippets_ok( $pod )
 
-Git url:  git://babyl.dyndns.org/test-pod-snippets.git
+Extracts the snippets from I<$pod> (which can be a string or a filename) and
+run the code, returning b<true> if the code run and b<false> if it fails.
 
-Web interface:  http://babyl.dyndns.org/git/test-pod-snippets.git
+=head1 HOW TO USE TEST::POD::SNIPPETS IN YOUR DISTRIBUTION
 
-=head1 SUPPORT
+The easiest way is to create a test.t file calling Test::Pod::Snippets
+as shown in the synopsis.  If, however, you don't want to 
+add T:P:S to your module's dependencies, you can 
+add the following to your Build.PL:
 
-You can find documentation for this module with the perldoc command.
+  my $builder = Module::Build->new(
+    # ... your M::B parameters
+    PL_files  => { 'script/test-pod-snippets.PL' => q{}  },
+    add_to_cleanup      => [ 't/tps-*.t' ],
+  );
 
-=for test ignore
+Then create the file F<script/test-pod-snippets.PL>, which should contains
 
-    perldoc Test::Pod::Snippets
+    use Test::Pod::Snippets;
 
-You can also look for information at:
+    my $tps = Test::Pod::Snippets->new;
 
-=over 4
+    my @files = qw#
+        lib/your/module.pm
+        lib/your/documentation.pod
+    #;
+    
+    print "generating tps tests...\n";
+    print $tps->generate_test_file( $_ ), "created\n" for @files;
+    print "done\n";
 
-=item * AnnoCPAN: Annotated CPAN documentation
+And you're set! Running B<Build> should now generate one test file
+for each given file.
 
-L<http://annocpan.org/dist/Test-Pod-Snippets>
+=head1 SYNTAX
 
-=item * CPAN Ratings
+By default, Test::Pod::Snippets considers all verbatim pod text to be 
+code snippets. To tell T::P::S to ignore subsequent pieces of verbatim text,
+add a C<=for test ignore> to the pod. Likely, to return to the normal behavior, 
+insert C<=for test>. For example:
 
-L<http://cpanratings.perl.org/d/Test-Pod-Snippets>
+    A sure way to make your script die is to do:
 
-=item * RT: CPAN's request tracker
+    =for test ignore
 
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Test-Pod-Snippets>
+        $y = 0; $x = 1/$y;
 
-=item * Search CPAN
+    The right (or safe) way to do it is rather:
 
-L<http://search.cpan.org/dist/Test-Pod-Snippets>
+    =for test
 
-=back
+        $y = 0; $x = eval { 1/$y };
+        warn $@ if $@;
+
+C<=for test> and C<=begin test ... =end test> can also be used to
+add code that should be include in the tests but not in the documentation.
+
+Example:
+
+    The right way to do it is:
+
+        $y = 0; $x = eval { 1/$y };
+
+        =for test
+           # make sure an error happened
+           is $x => undef;
+           ok length($@), 'error is reported';
 
 =head1 SEE ALSO
 
@@ -685,13 +774,20 @@ is equivalent to this code, using I<Test::Inline>:
     is $x => 'CAN YOU HEAR ME NOW?';
     =end testing
 
+=head1 AUTHOR
 
-=head1 COPYRIGHT & LICENSE
+Yanick Champoux <yanick@cpan.org>
 
-Copyright 2006, 2007, 2008 Yanick Champoux, all rights reserved.
+=head1 COPYRIGHT AND LICENSE
 
-This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
+This software is copyright (c) 2006 by Yanick Champoux.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =cut
+
+
+__END__
+
 

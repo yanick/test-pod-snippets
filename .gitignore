@@ -1,9 +1,0 @@
-Build
-_build
-blib
-*.swp
-*~
-META.yml
-Makefile.PL
-Test-Pod-Snippets-*.tar.gz
-Test-Pod-Snippets*
