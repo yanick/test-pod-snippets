@@ -50,6 +50,180 @@ has object_name => (
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+=method new( %options )
+
+Creates a new B<Test::Pod::Snippets> object. The method accepts
+the following options:
+
+=over
+
+=item verbatim => I<$boolean>
+
+If set to true, incorporates the pod's verbatim parts to the test.
+
+Set to true by default.
+
+=item functions => I<$boolean>
+
+If set to true, extracts function definitions from the pod.
+More specifically, Test::Pod::Snippets looks for a pod section 
+called FUNCTIONS, and assumes the title of all its 
+subsections to be functions. 
+
+For example, the pod
+
+    =head1 FUNCTIONS
+
+    =head2 play_song( I<$artist>, I<$song_title> )
+
+    Play $song_title from $artist.
+
+    =head2 set_lighting( I<$intensity> )
+
+    Set the room's light intensity (0 is pitch black 
+    and 1 is supernova white, -1 triggers the stroboscope).
+
+would generate the code
+
+    @result = play_song( $artist, $song_title );
+    @result = set_lightning( $intensity );
+
+Pod markups are automatically stripped from the headers. 
+
+=item methods  => I<$boolean>
+
+Same as C<functions>, but with methods. In this
+case, Test::Pod::Snippets looks for a pod section called METHODS.
+The object used for the tests is assumed to be '$thingy' 
+(but can be overriden using the argument C<object_name>,
+and its class must be given by a variable '$class'.
+
+For example, the pod
+
+    =head1 METHODS
+
+    =for test
+        $class = 'Amphibian::Frog';
+
+    =head2 new( $name )
+
+    Create a new froggy!
+
+    =head2 jump( $how_far )
+
+    Make it jumps.
+
+will produces
+
+    $class = 'Amphibian::Frog';
+    $thingy = $class->new( $name );
+    @result = $thingy->jump( $how_far );
+
+=item object_name => I<$identifier>
+
+The name of the object (with the leading '$') to be
+used for the methods if the T:P:S object is set to 
+extract methods.
+
+=item preserve_lines => I<$boolean>
+
+If sets to true (which is the default), the generated code
+will be peppered with '#line' pre-compiler lines that will
+have any failing test point to the test's original file.
+
+=back
+
+=method is_extracting_verbatim
+
+=method is_extracting_functions
+
+=method is_extracting_methods
+
+Returns true if the object is configured to
+extract that part of the pod, false otherwise.
+
+=method extracts_verbatim( I<$boolean> )
+
+=method extracts_functions( I<$boolean> )
+
+=method extracts_methods( I<$boolean> )
+
+Configure the object to extract (or not) the given
+pod parts.
+
+
+=method generate_test( $input_type => I<$input>, %options )
+
+Extracts the pod off I<$input> and generate tests out of it.
+I<$input_type> can be 'file' (a filename), 
+'fh' (a filehandler), 'pod' (a string containing pod) or
+'module' (a module name).
+
+The method returns the generate tests as a string.
+
+The method accepts the following options:
+
+=over
+
+=item standalone => I<$boolean>
+
+If standalone is true, the generated
+code will be a self-sufficient test script. 
+Defaults to 'false'.
+
+    # create a test script out of the module Foo::Bar
+    open my $test_fh, '>', 't/foo-bar.t' or die;
+    print {$test_fh} $tps->generate_test( 
+        module     => 'Foo::Bar',
+        standalone => 1 ,
+    );
+
+=item sanity_tests => I<$boolean>
+
+If true (which is the default), two tests are added to the
+very beginning and end of the extracted code, like so:
+
+    ok 1 => 'the tests compile';   
+    $extracted_code
+    ok 1 => 'we reached the end!';
+
+=item testgroup => I<$boolean>
+
+If true, the extracted code will be wrapped in a L<Test::Group> 
+test, which will report a single 'ok' for the whole series of test
+(but will give more details if something goes wrong).  Is set
+to 'false' by default.
+
+=back
+
+=method generate_test_file( $input_type => I<$input>, %options )
+
+Does the same as C<generate_test>, but save the generated
+code in a file. The name of the file is the value of the
+option B<output>, if given. If the file already exist,
+the method dies.  If B<output> is not given, 
+the filename will be
+of the format 'tps-XXXX.t', where XXXX is choosen not to
+interfere with existing tests.  Exception made of C<output>,
+the options accepted by the method are the same than for
+C<generate_test>.
+
+Returns the name of the created file.
+
+
+=method runtest( $input_type => I<$input>, %options )
+
+Does the same than C<generate_test>, except that it 
+executes the generated code rather than return it. 
+The arguments are treated the same as for C<generate_test>.
+
+=method generate_snippets( @filenames )
+
+For each file in I<@filenames>, generates a I<pod-snippets-X.t>
+file in the C<t/> directory.
+
+=cut
+
 sub generate_snippets {
     my( $self, @files ) = @_;
     my $i = 1;
@@ -65,14 +239,6 @@ sub generate_snippets {
         print {$fh} $self->extract_snippets( $_ );
         close $fh;
     }
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sub extract_from_string {
-    my ( $self, $string ) = @_;
-    open my $pod_fh, '<', \$string;
-    return $self->extract_snippets( $pod_fh );
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,7 +265,7 @@ sub generate_test {
         croak "can only accept one of those parameters: @type";
     }
 
-    my $code = $self->parse( $type[0], $param{ $type[0] } );
+    my $code = $self->_parse( $type[0], $param{ $type[0] } );
 
     if ($param{standalone} or $param{testgroup} ) {
         $param{sanity_tests} = 1;
@@ -142,7 +308,7 @@ END_CODE
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-sub parse {
+sub _parse {
     my ( $self, $type, $input ) = @_;
 
     my $output;
@@ -175,28 +341,50 @@ sub parse {
     return $output;
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~,
+=method extract_snippets_from_file( $filename )
 
-sub extract_snippets {
+Extracts the snippets from the file and returns a string containing
+the generated tests.
+
+=cut
+
+sub extract_snippets_from_file {
     my( $self, $file ) = @_;
 
-    my $filename_call = 'GLOB' ne ref $file;
-
-    if( $filename_call and not -f $file ) {
+    if( not -f $file ) {
         croak "$file doesn't seem to exist";
     }
 
     my $output;
     open my $fh, '>', \$output;
 
-    if ( $filename_call ) {
-        $self->parser->parse_from_file( $file, $fh );
-    } 
-    else {
-        $self->parser->parse_from_filehandle( $file, $fh );
-    }
+    $self->parser->parse_from_file( $file, $fh );
 
-    my $filename = $filename_call ? $file : 'unknown';
+    return $self->_extract($output);
+}
+
+=method extract_snippets( $pod )
+
+Extracts the snippets from the string I<$pod> and
+returns a string containing the generated tests.
+
+=cut
+
+sub extract_snippets {
+    my( $self, $pod ) = @_;
+
+    open my $file, '<', \$pod;
+
+    my $output;
+    open my $fh, '>', \$output;
+
+    $self->parser->parse_from_filehandle( $file, $fh );
+
+    return $self->_extract($output);
+}
+
+sub _extract {
+    my( $self, $output ) = @_;
 
     return <<"END_TESTS";
 use Test::More qw/ no_plan /;
@@ -229,6 +417,13 @@ sub runtest {
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+=method snippets_ok( $pod )
+
+Extracts the snippets from I<$pod> (which can be a string or a filename) and
+run the code, returning b<true> if the code run and b<false> if it fails.
+
+=cut
 
 sub snippets_ok {
     my( $self, $file ) = @_;
@@ -299,8 +494,6 @@ sub initialize {
 sub command {
     my ($parser, $command, $paragraph, $line_nbr ) = @_;
 
-    my $filename = $parser->input_file || 'unknown';
-
     if ( $command eq 'for' ) {
         my( $target, $directive, $rest ) = split ' ', $paragraph, 3;
 
@@ -320,7 +513,7 @@ sub command {
         print {$parser->output_handle} $rest;
     }
     elsif( $command eq 'end' ) {
-        my( $target, $rest ) = split ' ', $paragraph, 2;
+        my( $target ) = split ' ', $paragraph, 2;
         return unless $target eq 'test';
 
         $parser->{tps_within_begin_test} = 0;
@@ -429,8 +622,6 @@ sub print_paragraph {
 'end of Test::Pod::Snippets::Parser';
 __END__
 
-=for test ignore
-
 =head1 SYNOPSIS
 
     use Test::More tests => 3;
@@ -442,8 +633,6 @@ __END__
     my @modules = qw/ Foo Foo::Bar Foo::Baz /;
 
     $tps->runtest( module => $_, testgroup => 1 ) for @modules;
-
-=for test
 
 =head1 DESCRIPTION
 
@@ -478,8 +667,6 @@ as shown in the synopsis.  If, however, you don't want to
 add T:P:S to your module's dependencies, you can 
 add the following to your Build.PL:
 
-=for test ignore
-
   my $builder = Module::Build->new(
     # ... your M::B parameters
     PL_files  => { 'script/test-pod-snippets.PL' => q{}  },
@@ -501,8 +688,6 @@ Then create the file F<script/test-pod-snippets.PL>, which should contains
     print $tps->generate_test_file( $_ ), "created\n" for @files;
     print "done\n";
 
-=for test
-
 And you're set! Running B<Build> should now generate one test file
 for each given file.
 
@@ -512,8 +697,6 @@ By default, Test::Pod::Snippets considers all verbatim pod text to be
 code snippets. To tell T::P::S to ignore subsequent pieces of verbatim text,
 add a C<=for test ignore> to the pod. Likely, to return to the normal behavior, 
 insert C<=for test>. For example:
-
-=for test ignore
 
     A sure way to make your script die is to do:
 
@@ -542,186 +725,6 @@ Example:
            # make sure an error happened
            is $x => undef;
            ok length($@), 'error is reported';
-
-=for test
-
-=begin test
-
-ok 1 => 'begin works!';
-
-=end test
-
-=head1 METHODS
-
-=head2 new( I< %options > )
-
-Creates a new B<Test::Pod::Snippets> object. The method accepts
-the following options:
-
-=over
-
-=item verbatim => I<$boolean>
-
-If set to true, incorporates the pod's verbatim parts to the test.
-
-Set to true by default.
-
-=item functions => I<$boolean>
-
-If set to true, extracts function definitions from the pod.
-More specifically, Test::Pod::Snippets looks for a pod section 
-called FUNCTIONS, and assumes the title of all its 
-subsections to be functions. 
-
-For example, the pod
-
-=for test ignore
-
-    =head1 FUNCTIONS
-
-    =head2 play_song( I<$artist>, I<$song_title> )
-
-    Play $song_title from $artist.
-
-    =head2 set_lighting( I<$intensity> )
-
-    Set the room's light intensity (0 is pitch black 
-    and 1 is supernova white, -1 triggers the stroboscope).
-
-would generate the code
-
-    @result = play_song( $artist, $song_title );
-    @result = set_lightning( $intensity );
-
-Pod markups are automatically stripped from the headers. 
-
-=item methods  => I<$boolean>
-
-Same as C<functions>, but with methods. In this
-case, Test::Pod::Snippets looks for a pod section called METHODS.
-The object used for the tests is assumed to be '$thingy' 
-(but can be overriden using the argument C<object_name>,
-and its class must be given by a variable '$class'.
-
-For example, the pod
-
-    =head1 METHODS
-
-    =for test
-        $class = 'Amphibian::Frog';
-
-    =head2 new( $name )
-
-    Create a new froggy!
-
-    =head2 jump( $how_far )
-
-    Make it jumps.
-
-will produces
-
-    $class = 'Amphibian::Frog';
-    $thingy = $class->new( $name );
-    @result = $thingy->jump( $how_far );
-
-=item object_name => I<$identifier>
-
-The name of the object (with the leading '$') to be
-used for the methods if the T:P:S object is set to 
-extract methods.
-
-=item preserve_lines => I<$boolean>
-
-If sets to true (which is the default), the generated code
-will be peppered with '#line' pre-compiler lines that will
-have any failing test point to the test's original file.
-
-=back
-
-=head2 is_extracting_verbatim
-
-=head2 is_extracting_functions
-
-=head2 is_extracting_methods
-
-Returns true if the object is configured to
-extract that part of the pod, false otherwise.
-
-=head2 extracts_verbatim( I<$boolean> )
-
-=head2 extracts_functions( I<$boolean> )
-
-=head2 extracts_methods( I<$boolean> )
-
-Configure the object to extract (or not) the given
-pod parts.
-
-
-=head2 generate_test( $input_type => I<$input>, %options )
-
-Extracts the pod off I<$input> and generate tests out of it.
-I<$input_type> can be 'file' (a filename), 
-'fh' (a filehandler), 'pod' (a string containing pod) or
-'module' (a module name).
-
-The method returns the generate tests as a string.
-
-The method accepts the following options:
-
-=over
-
-=item standalone => I<$boolean>
-
-If standalone is true, the generated
-code will be a self-sufficient test script. 
-Defaults to 'false'.
-
-    # create a test script out of the module Foo::Bar
-    open my $test_fh, '>', 't/foo-bar.t' or die;
-    print {$test_fh} $tps->generate_test( 
-        module     => 'Foo::Bar',
-        standalone => 1 ,
-    );
-
-=item sanity_tests => I<$boolean>
-
-If true (which is the default), two tests are added to the
-very beginning and end of the extracted code, like so:
-
-    ok 1 => 'the tests compile';   
-    $extracted_code
-    ok 1 => 'we reached the end!';
-
-=item testgroup => I<$boolean>
-
-If true, the extracted code will be wrapped in a L<Test::Group> 
-test, which will report a single 'ok' for the whole series of test
-(but will give more details if something goes wrong).  Is set
-to 'false' by default.
-
-=back
-
-=head2 generate_test_file( $input_type => I<$input>, %options )
-
-Does the same as C<generate_test>, but save the generated
-code in a file. The name of the file is the value of the
-option B<output>, if given. If the file already exist,
-the method dies.  If B<output> is not given, 
-the filename will be
-of the format 'tps-XXXX.t', where XXXX is choosen not to
-interfere with existing tests.  Exception made of C<output>,
-the options accepted by the method are the same than for
-C<generate_test>.
-
-Returns the name of the created file.
-
-
-=head2 runtest( $input_type => I<$input>, %options )
-
-Does the same than C<generate_test>, except that it 
-executes the generated code rather than return it. 
-The arguments are treated the same as for C<generate_test>.
-
 
 =head1 SEE ALSO
 

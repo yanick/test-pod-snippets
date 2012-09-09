@@ -39,7 +39,7 @@ yada yada
 
 END_POD
 
-my $snippets = $tps->extract_from_string( $pod );
+my $snippets = $tps->extract_snippets( $pod );
 
 like    $snippets => qr/ONE/, 'catching verbatim stuff';
 like    $snippets => qr/FOUR/; 
@@ -48,7 +48,7 @@ unlike  $snippets => qr/TWO|THREE|FIVE/, '..and nothing else';
 $tps->extracts_verbatim( 0 );
 $tps->extracts_methods( 1 );
 
-$snippets = $tps->extract_from_string( $pod );
+$snippets = $tps->extract_snippets( $pod );
 
 like    $snippets => qr/TWO/, 'catching method bits';
 like    $snippets => qr/THREE/;
@@ -57,7 +57,7 @@ unlike  $snippets => qr/ONE|FOUR|FIVE/, '... and nothing else';
 $tps->extracts_methods( 0 );
 $tps->extracts_functions( 1 );
 
-$snippets = $tps->extract_from_string( $pod );
+$snippets = $tps->extract_snippets( $pod );
 
 like    $snippets => qr/FIVE/, 'catching function bits';
 unlike  $snippets => qr/ONE|TWO|THREE|FOUR/, '... and nothing else';
